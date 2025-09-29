@@ -1,0 +1,24 @@
+/* Estilos específicos para el componente de mapa */
+.custom-marker {
+  background: transparent;
+  border: none;
+}
+
+/* Asegurar que el mapa ocupe todo el espacio disponible */
+#mapContainer {
+  height: 100%;
+  width: 100%;
+}
+
+/* Estilos para los popups de Leaflet */
+.leaflet-popup-content {
+  font-family: inherit;
+}
+
+.leaflet-popup-content h3 {
+  margin: 0 0 8px 0;
+}
+
+.leaflet-popup-content p {
+  margin: 4px 0;
+}

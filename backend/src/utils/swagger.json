@@ -1,0 +1,3704 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "RODRIGO ISP Management API",
+    "version": "1.0.0",
+    "description": "API para gestión de NAPs (Network Access Points) y servicios ISP. Sistema completo para administración de redes, usuarios, clientes y equipos de telecomunicaciones.",
+    "contact": {
+      "name": "RODRIGO Team",
+      "email": "rodrigo@example.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "basePath": "/api/v1",
+  "securityDefinitions": {
+    "Bearer": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "Ingrese el token JWT en formato: Bearer <token>"
+    }
+  },
+  "schemes": ["http", "https"],
+  "tags": [
+    {
+      "name": "Sistema",
+      "description": "Endpoints del sistema y salud de la API"
+    },
+    {
+      "name": "Autenticación",
+      "description": "Endpoints de autenticación y autorización"
+    },
+    {
+      "name": "Usuarios",
+      "description": "Gestión de usuarios del sistema (ADMIN, TECNICO, SUPERVISOR)"
+    },
+    {
+      "name": "NAPs",
+      "description": "Gestión de Network Access Points (equipos de red)"
+    },
+    {
+      "name": "Clientes",
+      "description": "Gestión de clientes del servicio ISP"
+    },
+    {
+      "name": "Planes",
+      "description": "Gestión de planes de servicio de internet"
+    },
+    {
+      "name": "Conexiones",
+      "description": "Gestión de conexiones de clientes a puertos NAP"
+    },
+    {
+      "name": "Puertos",
+      "description": "Gestión de puertos de los equipos NAP"
+    },
+    {
+      "name": "Mantenimientos",
+      "description": "Gestión de mantenimientos preventivos y correctivos"
+    },
+    {
+      "name": "Dashboard",
+      "description": "Estadísticas y métricas del sistema"
+    },
+    {
+      "name": "Reportes",
+      "description": "Generación de reportes del sistema"
+    },
+    {
+      "name": "Auditoría",
+      "description": "Historial de cambios y auditoría del sistema"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Sistema"],
+        "summary": "Verificar el estado de salud de la API",
+        "description": "Endpoint para verificar que la API está funcionando correctamente",
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "API funcionando correctamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "message": {
+                  "type": "string",
+                  "example": "API funcionando correctamente"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2023-09-28T10:30:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Autenticación"],
+        "summary": "Iniciar sesión en el sistema",
+        "description": "Autentica a un usuario y devuelve un token JWT",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "credentials",
+            "in": "body",
+            "description": "Credenciales de acceso",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["correo", "clave"],
+              "properties": {
+                "correo": {
+                  "type": "string",
+                  "format": "email",
+                  "example": "Rodrigo.perez@ejemplo.com",
+                  "description": "Correo electrónico del usuario"
+                },
+                "clave": {
+                  "type": "string",
+                  "minLength": 6,
+                  "example": "clave123",
+                  "description": "Contraseña del usuario"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Login exitoso",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    },
+                    "usuario": {
+                      "$ref": "#/definitions/Usuario"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenciales inválidas",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "400": {
+            "description": "Datos de entrada inválidos",
+            "schema": {
+              "$ref": "#/definitions/ValidationError"
+            }
+          }
+        }
+      }
+    },
+    "/auth/perfil": {
+      "get": {
+        "tags": ["Autenticación"],
+        "summary": "Obtener perfil del usuario autenticado",
+        "description": "Devuelve la información del usuario que está autenticado",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Perfil obtenido exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Usuario"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token inválido o expirado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
+    },
+    "/usuarios/findAll": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Obtener lista de usuarios",
+        "description": "Obtiene una lista paginada de usuarios del sistema. Solo accesible por administradores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "rol",
+            "in": "query",
+            "description": "Filtrar por rol de usuario",
+            "required": false,
+            "type": "string",
+            "enum": ["ADMIN", "TECNICO", "SUPERVISOR"]
+          },
+          {
+            "name": "activo",
+            "in": "query",
+            "description": "Filtrar por estado activo",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "description": "Número de usuarios por página",
+            "required": false,
+            "type": "integer",
+            "default": 10
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "description": "Número de página",
+            "required": false,
+            "type": "integer",
+            "default": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de usuarios obtenida exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Usuario"
+                  }
+                },
+                "meta": {
+                  "$ref": "#/definitions/PaginationMeta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "403": {
+            "description": "Permisos insuficientes",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
+    },
+    "/usuarios/{id}": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Obtener usuario por ID",
+        "description": "Obtiene un usuario específico por su ID. Solo accesible por administradores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del usuario",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuario obtenido exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Usuario"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario no encontrado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "401": {
+            "description": "No autorizado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Usuarios"],
+        "summary": "Actualizar usuario",
+        "description": "Actualiza la información de un usuario. Solo accesible por administradores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del usuario",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          },
+          {
+            "name": "userData",
+            "in": "body",
+            "description": "Datos del usuario a actualizar",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "nombre": {
+                  "type": "string",
+                  "example": "Juan Pérez",
+                  "description": "Nombre completo del usuario"
+                },
+                "correo": {
+                  "type": "string",
+                  "format": "email",
+                  "example": "juan.perez@ejemplo.com",
+                  "description": "Correo electrónico del usuario"
+                },
+                "rol": {
+                  "type": "string",
+                  "enum": ["ADMIN", "TECNICO", "SUPERVISOR"],
+                  "example": "TECNICO",
+                  "description": "Rol del usuario en el sistema"
+                },
+                "clave": {
+                  "type": "string",
+                  "minLength": 6,
+                  "example": "nuevaclave123",
+                  "description": "Nueva contraseña del usuario (opcional)"
+                },
+                "activo": {
+                  "type": "boolean",
+                  "example": true,
+                  "description": "Estado activo del usuario"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuario actualizado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Usuario"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Usuario actualizado exitosamente"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos o correo ya existe",
+            "schema": {
+              "$ref": "#/definitions/ValidationError"
+            }
+          },
+          "404": {
+            "description": "Usuario no encontrado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Usuarios"],
+        "summary": "Desactivar usuario",
+        "description": "Desactiva un usuario del sistema. Solo accesible por administradores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del usuario",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuario desactivado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Usuario desactivado exitosamente"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario no encontrado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
+    },
+    "/usuarios/create": {
+      "post": {
+        "tags": ["Usuarios"],
+        "summary": "Crear nuevo usuario",
+        "description": "Crea un nuevo usuario en el sistema. Solo accesible por administradores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "userData",
+            "in": "body",
+            "description": "Datos del nuevo usuario",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["nombre", "correo", "rol", "clave"],
+              "properties": {
+                "nombre": {
+                  "type": "string",
+                  "example": "Juan Pérez",
+                  "description": "Nombre completo del usuario"
+                },
+                "correo": {
+                  "type": "string",
+                  "format": "email",
+                  "example": "juan.perez@ejemplo.com",
+                  "description": "Correo electrónico del usuario"
+                },
+                "rol": {
+                  "type": "string",
+                  "enum": ["ADMIN", "TECNICO", "SUPERVISOR"],
+                  "example": "TECNICO",
+                  "description": "Rol del usuario en el sistema"
+                },
+                "clave": {
+                  "type": "string",
+                  "minLength": 6,
+                  "example": "clave123",
+                  "description": "Contraseña del usuario"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Usuario creado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Usuario"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Usuario creado exitosamente"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos o correo ya existe",
+            "schema": {
+              "$ref": "#/definitions/ValidationError"
+            }
+          }
+        }
+      }
+    },
+    "/usuarios/registroRoot": {
+      "post": {
+        "tags": ["Usuarios"],
+        "summary": "Crear nuevo usuario (root)",
+        "description": "Crea un nuevo usuario en el sistema. Solo accesible por administradores.", 
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "userData",
+            "in": "body",
+            "description": "Datos del nuevo usuario",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["nombre", "correo", "rol", "clave"],
+              "properties": {
+                "nombre": {
+                  "type": "string",
+                  "example": "Juan Pérez",
+                  "description": "Nombre completo del usuario"
+                },
+                "correo": {
+                  "type": "string",
+                  "format": "email",
+                  "example": "juan.perez@ejemplo.com",
+                  "description": "Correo electrónico del usuario"
+                },
+                "rol": {
+                  "type": "string",
+                  "enum": ["ADMIN"],
+                  "example": "ADMIN",
+                  "description": "Rol del usuario en el sistema"
+                },
+                "clave": {
+                  "type": "string",
+                  "minLength": 6,
+                  "example": "clave123",
+                  "description": "Contraseña del usuario"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Usuario creado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Usuario"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Usuario creado exitosamente"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos o correo ya existe",
+            "schema": {
+              "$ref": "#/definitions/ValidationError"
+            }
+          }
+        }
+      }
+    },
+    "/usuarios/cambiar-clave": {
+      "patch": {
+        "tags": ["Usuarios"],
+        "summary": "Cambiar contraseña del usuario autenticado",
+        "description": "Permite al usuario cambiar su propia contraseña",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "passwordData",
+            "in": "body",
+            "description": "Datos para cambio de contraseña",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["claveActual", "claveNueva"],
+              "properties": {
+                "claveActual": {
+                  "type": "string",
+                  "minLength": 6,
+                  "example": "claveactual123",
+                  "description": "Contraseña actual del usuario"
+                },
+                "claveNueva": {
+                  "type": "string",
+                  "minLength": 6,
+                  "example": "nuevaclave123",
+                  "description": "Nueva contraseña del usuario"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contraseña actualizada exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Clave actualizada exitosamente"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Contraseña actual incorrecta",
+            "schema": {
+              "$ref": "#/definitions/ValidationError"
+            }
+          }
+        }
+      }
+    },
+    "/naps": {
+      "get": {
+        "tags": ["NAPs"],
+        "summary": "Obtener lista de NAPs",
+        "description": "Obtiene una lista paginada de Network Access Points con sus estadísticas",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "estado",
+            "in": "query",
+            "description": "Filtrar por estado del NAP",
+            "required": false,
+            "type": "string",
+            "enum": ["ACTIVO", "MANTENIMIENTO", "SATURADO"]
+          },
+          {
+            "name": "busqueda",
+            "in": "query",
+            "description": "Búsqueda por código, modelo o ubicación",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "description": "Número de NAPs por página",
+            "required": false,
+            "type": "integer",
+            "default": 10
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "description": "Número de página",
+            "required": false,
+            "type": "integer",
+            "default": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de NAPs obtenida exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/NAPConEstadisticas"
+                  }
+                },
+                "meta": {
+                  "$ref": "#/definitions/PaginationMeta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["NAPs"],
+        "summary": "Crear nuevo NAP",
+        "description": "Crea un nuevo Network Access Point. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "napData",
+            "in": "body",
+            "description": "Datos del nuevo NAP",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NAPInput"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "NAP creado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/NAP"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "NAP creado exitosamente"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos o código ya existe",
+            "schema": {
+              "$ref": "#/definitions/ValidationError"
+            }
+          },
+          "403": {
+            "description": "Permisos insuficientes",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
+    },
+    "/naps/{id}": {
+      "get": {
+        "tags": ["NAPs"],
+        "summary": "Obtener NAP por ID",
+        "description": "Obtiene un Network Access Point específico con detalles de puertos y conexiones",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del NAP",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NAP obtenido exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/NAPDetallado"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NAP no encontrado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["NAPs"],
+        "summary": "Actualizar NAP",
+        "description": "Actualiza la información de un NAP. Solo accesible por administradores y técnicos.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del NAP",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          },
+          {
+            "name": "napData",
+            "in": "body",
+            "description": "Datos del NAP a actualizar",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NAPInput"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NAP actualizado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/NAP"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "NAP actualizado exitosamente"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NAP no encontrado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
+    },
+    "/naps/mapa": {
+      "get": {
+        "tags": ["NAPs"],
+        "summary": "Obtener NAPs para visualización en mapa",
+        "description": "Obtiene todos los NAPs con coordenadas geográficas y estadísticas básicas para mostrar en un mapa",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "NAPs para mapa obtenidos exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/NAPMapa"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
+    },
+    "/clientes": {
+      "get": {
+        "tags": ["Clientes"],
+        "summary": "Obtener lista de clientes",
+        "description": "Obtiene una lista paginada de clientes del sistema",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "limite",
+            "in": "query",
+            "description": "Número de clientes por página",
+            "required": false,
+            "type": "integer",
+            "default": 10
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "description": "Número de página",
+            "required": false,
+            "type": "integer",
+            "default": 1
+          },
+          {
+            "name": "buscar",
+            "in": "query",
+            "description": "Buscar por nombre, CI o correo",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de clientes obtenida exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Cliente"
+                  }
+                },
+                "meta": {
+                  "$ref": "#/definitions/PaginationMeta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Clientes"],
+        "summary": "Crear nuevo cliente",
+        "description": "Crea un nuevo cliente en el sistema. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "clienteData",
+            "in": "body",
+            "description": "Datos del cliente a crear",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ClienteInput"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Cliente creado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Cliente"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Cliente creado exitosamente"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos o CI ya existe",
+            "schema": {
+              "$ref": "#/definitions/ValidationError"
+            }
+          },
+          "403": {
+            "description": "Permisos insuficientes",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
+    },
+    "/clientes/{id}": {
+      "get": {
+        "tags": ["Clientes"],
+        "summary": "Obtener cliente por ID",
+        "description": "Obtiene un cliente específico por su ID",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del cliente",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cliente obtenido exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Cliente"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cliente no encontrado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Clientes"],
+        "summary": "Actualizar cliente",
+        "description": "Actualiza la información de un cliente. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del cliente",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          },
+          {
+            "name": "clienteData",
+            "in": "body",
+            "description": "Datos del cliente a actualizar",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ClienteInput"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cliente actualizado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Cliente"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Cliente actualizado exitosamente"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cliente no encontrado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Clientes"],
+        "summary": "Eliminar cliente",
+        "description": "Elimina un cliente del sistema. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del cliente",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cliente eliminado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Cliente eliminado exitosamente"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cliente no encontrado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
+    },
+    "/planes": {
+      "get": {
+        "tags": ["Planes"],
+        "summary": "Obtener lista de planes",
+        "description": "Obtiene una lista paginada de planes de servicio",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "limite",
+            "in": "query",
+            "description": "Número de planes por página",
+            "required": false,
+            "type": "integer",
+            "default": 10
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "description": "Número de página",
+            "required": false,
+            "type": "integer",
+            "default": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de planes obtenida exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Plan"
+                  }
+                },
+                "meta": {
+                  "$ref": "#/definitions/PaginationMeta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Planes"],
+        "summary": "Crear nuevo plan",
+        "description": "Crea un nuevo plan de servicio. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "planData",
+            "in": "body",
+            "description": "Datos del plan a crear",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/PlanInput"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Plan creado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Plan"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Plan creado exitosamente"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/planes/{id}": {
+      "get": {
+        "tags": ["Planes"],
+        "summary": "Obtener plan por ID",
+        "description": "Obtiene un plan específico por su ID",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del plan",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plan obtenido exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Plan"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Plan no encontrado",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Planes"],
+        "summary": "Actualizar plan",
+        "description": "Actualiza la información de un plan. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del plan",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          },
+          {
+            "name": "planData",
+            "in": "body",
+            "description": "Datos del plan a actualizar",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/PlanInput"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plan actualizado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Plan"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Planes"],
+        "summary": "Eliminar plan",
+        "description": "Elimina un plan del sistema. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del plan",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plan eliminado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Plan eliminado exitosamente"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conexiones": {
+      "get": {
+        "tags": ["Conexiones"],
+        "summary": "Obtener lista de conexiones",
+        "description": "Obtiene una lista paginada de conexiones de clientes",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "estado",
+            "in": "query",
+            "description": "Filtrar por estado de conexión",
+            "required": false,
+            "type": "string",
+            "enum": ["ACTIVA", "SUSPENDIDA", "FINALIZADA"]
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "description": "Número de conexiones por página",
+            "required": false,
+            "type": "integer",
+            "default": 10
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "description": "Número de página",
+            "required": false,
+            "type": "integer",
+            "default": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de conexiones obtenida exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Conexion"
+                  }
+                },
+                "meta": {
+                  "$ref": "#/definitions/PaginationMeta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Conexiones"],
+        "summary": "Crear nueva conexión",
+        "description": "Crea una nueva conexión de cliente a puerto. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "conexionData",
+            "in": "body",
+            "description": "Datos de la conexión a crear",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ConexionInput"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Conexión creada exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Conexion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conexiones/{id}": {
+      "get": {
+        "tags": ["Conexiones"],
+        "summary": "Obtener conexión por ID",
+        "description": "Obtiene una conexión específica por su ID",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID de la conexión",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conexión obtenida exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Conexion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Conexiones"],
+        "summary": "Actualizar conexión",
+        "description": "Actualiza la información de una conexión. Solo accesible por administradores y técnicos.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID de la conexión",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          },
+          {
+            "name": "conexionData",
+            "in": "body",
+            "description": "Datos de la conexión a actualizar",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "estado": {
+                  "type": "string",
+                  "enum": ["ACTIVA", "SUSPENDIDA", "FINALIZADA"]
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conexión actualizada exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Conexion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conexiones/cliente/{cliente_id}": {
+      "get": {
+        "tags": ["Conexiones"],
+        "summary": "Obtener conexiones por cliente",
+        "description": "Obtiene todas las conexiones de un cliente específico",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "cliente_id",
+            "in": "path",
+            "description": "ID del cliente",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conexiones del cliente obtenidas exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Conexion"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conexiones/{id}/finalizar": {
+      "patch": {
+        "tags": ["Conexiones"],
+        "summary": "Finalizar conexión",
+        "description": "Finaliza una conexión activa. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID de la conexión",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conexión finalizada exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Conexion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/puertos/libres": {
+      "get": {
+        "tags": ["Puertos"],
+        "summary": "Obtener puertos libres",
+        "description": "Obtiene una lista de puertos disponibles (libres) en todos los NAPs",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "nap_id",
+            "in": "query",
+            "description": "Filtrar por NAP específico",
+            "required": false,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Puertos libres obtenidos exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Puerto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/puertos/estadisticas": {
+      "get": {
+        "tags": ["Puertos"],
+        "summary": "Obtener estadísticas de puertos",
+        "description": "Obtiene estadísticas generales sobre el uso de puertos",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Estadísticas de puertos obtenidas exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "total_puertos": {
+                      "type": "integer",
+                      "example": 1000
+                    },
+                    "puertos_libres": {
+                      "type": "integer",
+                      "example": 650
+                    },
+                    "puertos_ocupados": {
+                      "type": "integer",
+                      "example": 300
+                    },
+                    "puertos_mantenimiento": {
+                      "type": "integer",
+                      "example": 50
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/puertos/nap/{nap_id}": {
+      "get": {
+        "tags": ["Puertos"],
+        "summary": "Obtener puertos por NAP",
+        "description": "Obtiene todos los puertos de un NAP específico",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "nap_id",
+            "in": "path",
+            "description": "ID del NAP",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Puertos del NAP obtenidos exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Puerto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/puertos/nap/{nap_id}/crear": {
+      "post": {
+        "tags": ["Puertos"],
+        "summary": "Crear puertos para NAP",
+        "description": "Crea puertos automáticamente para un NAP. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "nap_id",
+            "in": "path",
+            "description": "ID del NAP",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          },
+          {
+            "name": "puertoData",
+            "in": "body",
+            "description": "Datos para crear puertos",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "cantidad": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100,
+                  "example": 24,
+                  "description": "Cantidad de puertos a crear"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Puertos creados exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Puerto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/puertos/{id}": {
+      "get": {
+        "tags": ["Puertos"],
+        "summary": "Obtener puerto por ID",
+        "description": "Obtiene un puerto específico por su ID",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del puerto",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Puerto obtenido exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Puerto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Puertos"],
+        "summary": "Actualizar puerto",
+        "description": "Actualiza la información de un puerto. Solo accesible por administradores y técnicos.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del puerto",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          },
+          {
+            "name": "puertoData",
+            "in": "body",
+            "description": "Datos del puerto a actualizar",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/PuertoInput"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Puerto actualizado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Puerto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mantenimientos": {
+      "get": {
+        "tags": ["Mantenimientos"],
+        "summary": "Obtener lista de mantenimientos",
+        "description": "Obtiene una lista paginada de mantenimientos registrados",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "tipo",
+            "in": "query",
+            "description": "Filtrar por tipo de mantenimiento",
+            "required": false,
+            "type": "string",
+            "enum": ["PREVENTIVO", "CORRECTIVO"]
+          },
+          {
+            "name": "nap_id",
+            "in": "query",
+            "description": "Filtrar por NAP específico",
+            "required": false,
+            "type": "string",
+            "format": "uuid"
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "description": "Número de mantenimientos por página",
+            "required": false,
+            "type": "integer",
+            "default": 10
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "description": "Número de página",
+            "required": false,
+            "type": "integer",
+            "default": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de mantenimientos obtenida exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Mantenimiento"
+                  }
+                },
+                "meta": {
+                  "$ref": "#/definitions/PaginationMeta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Mantenimientos"],
+        "summary": "Crear nuevo mantenimiento",
+        "description": "Registra un nuevo mantenimiento. Solo accesible por administradores y técnicos.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "mantenimientoData",
+            "in": "body",
+            "description": "Datos del mantenimiento a crear",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MantenimientoInput"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Mantenimiento creado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Mantenimiento"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mantenimientos/estadisticas": {
+      "get": {
+        "tags": ["Mantenimientos"],
+        "summary": "Obtener estadísticas de mantenimientos",
+        "description": "Obtiene estadísticas sobre mantenimientos realizados",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Estadísticas de mantenimientos obtenidas exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "total_mantenimientos": {
+                      "type": "integer",
+                      "example": 150
+                    },
+                    "preventivos": {
+                      "type": "integer",
+                      "example": 100
+                    },
+                    "correctivos": {
+                      "type": "integer",
+                      "example": 50
+                    },
+                    "este_mes": {
+                      "type": "integer",
+                      "example": 25
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mantenimientos/nap/{nap_id}": {
+      "get": {
+        "tags": ["Mantenimientos"],
+        "summary": "Obtener mantenimientos por NAP",
+        "description": "Obtiene todos los mantenimientos de un NAP específico",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "nap_id",
+            "in": "path",
+            "description": "ID del NAP",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mantenimientos del NAP obtenidos exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Mantenimiento"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mantenimientos/{id}": {
+      "get": {
+        "tags": ["Mantenimientos"],
+        "summary": "Obtener mantenimiento por ID",
+        "description": "Obtiene un mantenimiento específico por su ID",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del mantenimiento",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mantenimiento obtenido exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Mantenimiento"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Mantenimientos"],
+        "summary": "Actualizar mantenimiento",
+        "description": "Actualiza la información de un mantenimiento. Solo accesible por administradores y técnicos.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del mantenimiento",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          },
+          {
+            "name": "mantenimientoData",
+            "in": "body",
+            "description": "Datos del mantenimiento a actualizar",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MantenimientoInput"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mantenimiento actualizado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "$ref": "#/definitions/Mantenimiento"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Mantenimientos"],
+        "summary": "Eliminar mantenimiento",
+        "description": "Elimina un mantenimiento del sistema. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID del mantenimiento",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mantenimiento eliminado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Mantenimiento eliminado exitosamente"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/estadisticas": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Obtener estadísticas generales",
+        "description": "Obtiene estadísticas generales del sistema para el dashboard",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Estadísticas generales obtenidas exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "total_naps": {
+                      "type": "integer",
+                      "example": 45
+                    },
+                    "naps_activos": {
+                      "type": "integer",
+                      "example": 40
+                    },
+                    "total_clientes": {
+                      "type": "integer",
+                      "example": 350
+                    },
+                    "conexiones_activas": {
+                      "type": "integer",
+                      "example": 320
+                    },
+                    "puertos_libres": {
+                      "type": "integer",
+                      "example": 150
+                    },
+                    "mantenimientos_pendientes": {
+                      "type": "integer",
+                      "example": 5
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/alertas": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Obtener alertas del sistema",
+        "description": "Obtiene alertas importantes del sistema",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Alertas obtenidas exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "tipo": {
+                        "type": "string",
+                        "enum": ["NAP_SATURADO", "MANTENIMIENTO_PENDIENTE", "CONEXION_PROBLEMATICA"],
+                        "example": "NAP_SATURADO"
+                      },
+                      "mensaje": {
+                        "type": "string",
+                        "example": "NAP Centro tiene más del 90% de puertos ocupados"
+                      },
+                      "severidad": {
+                        "type": "string",
+                        "enum": ["BAJA", "MEDIA", "ALTA"],
+                        "example": "ALTA"
+                      },
+                      "fecha": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2023-09-28T10:30:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/ocupacion": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Obtener ocupación de NAPs",
+        "description": "Obtiene información sobre la ocupación de puertos en cada NAP",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Ocupación de NAPs obtenida exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "nap_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "codigo": {
+                        "type": "string",
+                        "example": "NAP-001"
+                      },
+                      "ubicacion": {
+                        "type": "string",
+                        "example": "Centro La Paz"
+                      },
+                      "total_puertos": {
+                        "type": "integer",
+                        "example": 24
+                      },
+                      "puertos_ocupados": {
+                        "type": "integer",
+                        "example": 20
+                      },
+                      "porcentaje_ocupacion": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 83.33
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/periodo": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Obtener estadísticas por período",
+        "description": "Obtiene estadísticas del sistema para un período específico",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "description": "Fecha de inicio del período (YYYY-MM-DD)",
+            "required": false,
+            "type": "string",
+            "format": "date"
+          },
+          {
+            "name": "fin",
+            "in": "query",
+            "description": "Fecha de fin del período (YYYY-MM-DD)",
+            "required": false,
+            "type": "string",
+            "format": "date"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estadísticas por período obtenidas exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "nuevos_clientes": {
+                      "type": "integer",
+                      "example": 25
+                    },
+                    "nuevas_conexiones": {
+                      "type": "integer",
+                      "example": 30
+                    },
+                    "mantenimientos_realizados": {
+                      "type": "integer",
+                      "example": 15
+                    },
+                    "conexiones_finalizadas": {
+                      "type": "integer",
+                      "example": 8
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reportes/tipos": {
+      "get": {
+        "tags": ["Reportes"],
+        "summary": "Obtener tipos de reportes disponibles",
+        "description": "Obtiene la lista de tipos de reportes que se pueden generar",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Tipos de reportes obtenidos exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "example": "ocupacion"
+                      },
+                      "nombre": {
+                        "type": "string",
+                        "example": "Reporte de Ocupación de NAPs"
+                      },
+                      "descripcion": {
+                        "type": "string",
+                        "example": "Muestra el estado de ocupación de puertos en todos los NAPs"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reportes/ocupacion": {
+      "get": {
+        "tags": ["Reportes"],
+        "summary": "Generar reporte de ocupación de NAPs",
+        "description": "Genera un reporte detallado sobre la ocupación de puertos en los NAPs. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "formato",
+            "in": "query",
+            "description": "Formato del reporte",
+            "required": false,
+            "type": "string",
+            "enum": ["JSON", "CSV", "PDF"],
+            "default": "JSON"
+          },
+          {
+            "name": "nap_id",
+            "in": "query",
+            "description": "Filtrar por NAP específico",
+            "required": false,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte de ocupación generado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "titulo": {
+                      "type": "string",
+                      "example": "Reporte de Ocupación de NAPs"
+                    },
+                    "fecha_generacion": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "naps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "codigo": {
+                            "type": "string",
+                            "example": "NAP-001"
+                          },
+                          "ubicacion": {
+                            "type": "string",
+                            "example": "Centro La Paz"
+                          },
+                          "total_puertos": {
+                            "type": "integer",
+                            "example": 24
+                          },
+                          "puertos_ocupados": {
+                            "type": "integer",
+                            "example": 20
+                          },
+                          "porcentaje_ocupacion": {
+                            "type": "number",
+                            "format": "float",
+                            "example": 83.33
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reportes/consumo": {
+      "get": {
+        "tags": ["Reportes"],
+        "summary": "Generar reporte de consumo por cliente",
+        "description": "Genera un reporte del consumo de servicios por cliente. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "formato",
+            "in": "query",
+            "description": "Formato del reporte",
+            "required": false,
+            "type": "string",
+            "enum": ["JSON", "CSV", "PDF"],
+            "default": "JSON"
+          },
+          {
+            "name": "fecha_inicio",
+            "in": "query",
+            "description": "Fecha de inicio del período",
+            "required": false,
+            "type": "string",
+            "format": "date"
+          },
+          {
+            "name": "fecha_fin",
+            "in": "query",
+            "description": "Fecha de fin del período",
+            "required": false,
+            "type": "string",
+            "format": "date"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte de consumo generado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "titulo": {
+                      "type": "string",
+                      "example": "Reporte de Consumo por Cliente"
+                    },
+                    "periodo": {
+                      "type": "object",
+                      "properties": {
+                        "inicio": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "fin": {
+                          "type": "string",
+                          "format": "date"
+                        }
+                      }
+                    },
+                    "clientes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/definitions/ReporteConsumoCliente"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reportes/tecnico": {
+      "get": {
+        "tags": ["Reportes"],
+        "summary": "Generar reporte de estado técnico",
+        "description": "Genera un reporte del estado técnico de la infraestructura. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "formato",
+            "in": "query",
+            "description": "Formato del reporte",
+            "required": false,
+            "type": "string",
+            "enum": ["JSON", "CSV", "PDF"],
+            "default": "JSON"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte técnico generado exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "titulo": {
+                      "type": "string",
+                      "example": "Reporte de Estado Técnico"
+                    },
+                    "resumen": {
+                      "type": "object",
+                      "properties": {
+                        "naps_activos": {
+                          "type": "integer",
+                          "example": 40
+                        },
+                        "naps_mantenimiento": {
+                          "type": "integer",
+                          "example": 3
+                        },
+                        "puertos_operativos": {
+                          "type": "integer",
+                          "example": 950
+                        },
+                        "mantenimientos_mes": {
+                          "type": "integer",
+                          "example": 25
+                        }
+                      }
+                    },
+                    "naps": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/definitions/ReporteTecnicoNAP"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auditoria": {
+      "get": {
+        "tags": ["Auditoría"],
+        "summary": "Obtener historial de cambios",
+        "description": "Obtiene el historial completo de cambios en el sistema. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "tabla",
+            "in": "query",
+            "description": "Filtrar por tabla específica",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "accion",
+            "in": "query",
+            "description": "Filtrar por tipo de acción",
+            "required": false,
+            "type": "string",
+            "enum": ["CREATE", "UPDATE", "DELETE"]
+          },
+          {
+            "name": "usuario_id",
+            "in": "query",
+            "description": "Filtrar por usuario que realizó el cambio",
+            "required": false,
+            "type": "string",
+            "format": "uuid"
+          },
+          {
+            "name": "fecha_inicio",
+            "in": "query",
+            "description": "Fecha de inicio del período",
+            "required": false,
+            "type": "string",
+            "format": "date"
+          },
+          {
+            "name": "fecha_fin",
+            "in": "query",
+            "description": "Fecha de fin del período",
+            "required": false,
+            "type": "string",
+            "format": "date"
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "description": "Número de registros por página",
+            "required": false,
+            "type": "integer",
+            "default": 10
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "description": "Número de página",
+            "required": false,
+            "type": "integer",
+            "default": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historial de cambios obtenido exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Auditoria"
+                  }
+                },
+                "meta": {
+                  "$ref": "#/definitions/PaginationMeta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auditoria/estadisticas": {
+      "get": {
+        "tags": ["Auditoría"],
+        "summary": "Obtener estadísticas de auditoría",
+        "description": "Obtiene estadísticas sobre la actividad de auditoría. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Estadísticas de auditoría obtenidas exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "total_cambios": {
+                      "type": "integer",
+                      "example": 1250
+                    },
+                    "cambios_hoy": {
+                      "type": "integer",
+                      "example": 15
+                    },
+                    "cambios_esta_semana": {
+                      "type": "integer",
+                      "example": 89
+                    },
+                    "por_accion": {
+                      "type": "object",
+                      "properties": {
+                        "CREATE": {
+                          "type": "integer",
+                          "example": 450
+                        },
+                        "UPDATE": {
+                          "type": "integer",
+                          "example": 650
+                        },
+                        "DELETE": {
+                          "type": "integer",
+                          "example": 150
+                        }
+                      }
+                    },
+                    "tablas_mas_activas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tabla": {
+                            "type": "string",
+                            "example": "conexiones"
+                          },
+                          "cambios": {
+                            "type": "integer",
+                            "example": 350
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auditoria/tablas": {
+      "get": {
+        "tags": ["Auditoría"],
+        "summary": "Obtener tablas auditadas",
+        "description": "Obtiene la lista de tablas que están siendo auditadas. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Tablas auditadas obtenidas exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "example": "usuarios"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auditoria/{tabla}/{registro_id}": {
+      "get": {
+        "tags": ["Auditoría"],
+        "summary": "Obtener historial por registro",
+        "description": "Obtiene el historial de cambios de un registro específico. Solo accesible por administradores y supervisores.",
+        "security": [{"Bearer": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "tabla",
+            "in": "path",
+            "description": "Nombre de la tabla",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "registro_id",
+            "in": "path",
+            "description": "ID del registro",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historial del registro obtenido exitosamente",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Auditoria"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Usuario": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "example": "123e4567-e89b-12d3-a456-426614174000"
+        },
+        "nombre": {
+          "type": "string",
+          "example": "Juan Pérez"
+        },
+        "correo": {
+          "type": "string",
+          "format": "email",
+          "example": "juan.perez@ejemplo.com"
+        },
+        "rol": {
+          "type": "string",
+          "enum": ["ADMIN", "TECNICO", "SUPERVISOR"],
+          "example": "TECNICO"
+        },
+        "activo": {
+          "type": "boolean",
+          "example": true
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2023-09-28T10:30:00.000Z"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2023-09-28T10:30:00.000Z"
+        }
+      }
+    },
+    "NAP": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "example": "123e4567-e89b-12d3-a456-426614174000"
+        },
+        "codigo": {
+          "type": "string",
+          "example": "NAP-001"
+        },
+        "modelo": {
+          "type": "string",
+          "example": "Huawei MA5608T"
+        },
+        "firmware": {
+          "type": "string",
+          "example": "V800R017C10"
+        },
+        "estado": {
+          "type": "string",
+          "enum": ["ACTIVO", "MANTENIMIENTO", "SATURADO"],
+          "example": "ACTIVO"
+        },
+        "total_puertos": {
+          "type": "integer",
+          "example": 48
+        },
+        "ubicacion": {
+          "type": "string",
+          "example": "Av. Siempre Viva 123, Springfield"
+        },
+        "latitud": {
+          "type": "number",
+          "format": "float",
+          "example": -12.046374
+        },
+        "longitud": {
+          "type": "number",
+          "format": "float",
+          "example": -77.042793
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2023-09-28T10:30:00.000Z"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2023-09-28T10:30:00.000Z"
+        }
+      }
+    },
+    "NAPInput": {
+      "type": "object",
+      "required": ["codigo", "modelo", "total_puertos", "ubicacion", "latitud", "longitud"],
+      "properties": {
+        "codigo": {
+          "type": "string",
+          "example": "NAP-001",
+          "description": "Código único del NAP"
+        },
+        "modelo": {
+          "type": "string",
+          "example": "Huawei MA5608T",
+          "description": "Modelo del equipo NAP"
+        },
+        "firmware": {
+          "type": "string",
+          "example": "V800R017C10",
+          "description": "Versión del firmware (opcional)"
+        },
+        "estado": {
+          "type": "string",
+          "enum": ["ACTIVO", "MANTENIMIENTO", "SATURADO"],
+          "example": "ACTIVO",
+          "description": "Estado operativo del NAP"
+        },
+        "total_puertos": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "example": 48,
+          "description": "Número total de puertos del NAP"
+        },
+        "ubicacion": {
+          "type": "string",
+          "example": "Av. Siempre Viva 123, Springfield",
+          "description": "Dirección física del NAP"
+        },
+        "latitud": {
+          "type": "number",
+          "format": "float",
+          "minimum": -90,
+          "maximum": 90,
+          "example": -12.046374,
+          "description": "Latitud geográfica"
+        },
+        "longitud": {
+          "type": "number",
+          "format": "float",
+          "minimum": -180,
+          "maximum": 180,
+          "example": -77.042793,
+          "description": "Longitud geográfica"
+        }
+      }
+    },
+    "NAPConEstadisticas": {
+      "allOf": [
+        {"$ref": "#/definitions/NAP"},
+        {
+          "type": "object",
+          "properties": {
+            "estadisticas": {
+              "type": "object",
+              "properties": {
+                "puertos_ocupados": {
+                  "type": "integer",
+                  "example": 32
+                },
+                "puertos_libres": {
+                  "type": "integer",
+                  "example": 16
+                },
+                "porcentaje_ocupacion": {
+                  "type": "number",
+                  "format": "float",
+                  "example": 66.67
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "NAPDetallado": {
+      "allOf": [
+        {"$ref": "#/definitions/NAP"},
+        {
+          "type": "object",
+          "properties": {
+            "puertos": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Puerto"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "NAPMapa": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "codigo": {
+          "type": "string",
+          "example": "NAP-001"
+        },
+        "modelo": {
+          "type": "string",
+          "example": "Huawei MA5608T"
+        },
+        "estado": {
+          "type": "string",
+          "enum": ["ACTIVO", "MANTENIMIENTO", "SATURADO"]
+        },
+        "ubicacion": {
+          "type": "string",
+          "example": "Av. Siempre Viva 123, Springfield"
+        },
+        "coordenadas": {
+          "type": "object",
+          "properties": {
+            "latitud": {
+              "type": "number",
+              "format": "float",
+              "example": -12.046374
+            },
+            "longitud": {
+              "type": "number",
+              "format": "float",
+              "example": -77.042793
+            }
+          }
+        },
+        "estadisticas": {
+          "type": "object",
+          "properties": {
+            "total_puertos": {
+              "type": "integer",
+              "example": 48
+            },
+            "puertos_ocupados": {
+              "type": "integer",
+              "example": 32
+            },
+            "porcentaje_ocupacion": {
+              "type": "number",
+              "format": "float",
+              "example": 66.67
+            }
+          }
+        }
+      }
+    },
+    "Puerto": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nap_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "numero": {
+          "type": "integer",
+          "example": 1
+        },
+        "estado": {
+          "type": "string",
+          "enum": ["LIBRE", "OCUPADO", "MANTENIMIENTO"],
+          "example": "OCUPADO"
+        },
+        "nota": {
+          "type": "string",
+          "example": "Puerto asignado a cliente residencial"
+        },
+        "nap": {
+          "$ref": "#/definitions/NAP"
+        },
+        "conexion": {
+          "$ref": "#/definitions/Conexion"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "Conexion": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "puerto_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "cliente_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "plan_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "fecha_inicio": {
+          "type": "string",
+          "format": "date",
+          "example": "2023-09-15"
+        },
+        "fecha_fin": {
+          "type": "string",
+          "format": "date"
+        },
+        "estado": {
+          "type": "string",
+          "enum": ["ACTIVA", "SUSPENDIDA", "FINALIZADA"],
+          "example": "ACTIVA"
+        },
+        "creado_por": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "cliente": {
+          "$ref": "#/definitions/Cliente"
+        },
+        "plan": {
+          "$ref": "#/definitions/Plan"
+        },
+        "puerto": {
+          "$ref": "#/definitions/Puerto"
+        },
+        "usuario": {
+          "$ref": "#/definitions/Usuario"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "Cliente": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "ci": {
+          "type": "string",
+          "example": "12345678"
+        },
+        "nombre": {
+          "type": "string",
+          "example": "María García"
+        },
+        "telefono": {
+          "type": "string",
+          "example": "+591 70123456"
+        },
+        "correo": {
+          "type": "string",
+          "format": "email",
+          "example": "maria.garcia@email.com"
+        },
+        "direccion": {
+          "type": "string",
+          "example": "Calle Los Álamos 456, La Paz"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "Plan": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nombre": {
+          "type": "string",
+          "example": "Plan Hogar 20MB"
+        },
+        "velocidad_mbps": {
+          "type": "integer",
+          "example": 20
+        },
+        "descripcion": {
+          "type": "string",
+          "example": "Plan residencial con 20 Mbps de velocidad"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "PaginationMeta": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "example": 100
+        },
+        "pagina": {
+          "type": "integer",
+          "example": 1
+        },
+        "limite": {
+          "type": "integer",
+          "example": 10
+        },
+        "total_paginas": {
+          "type": "integer",
+          "example": 10
+        }
+      }
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "example": false
+        },
+        "message": {
+          "type": "string",
+          "example": "Error descripción"
+        }
+      }
+    },
+    "ValidationError": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "example": false
+        },
+        "message": {
+          "type": "string",
+          "example": "Error de validación"
+        },
+        "errores": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "example": "correo"
+              },
+              "message": {
+                "type": "string",
+                "example": "El correo debe ser válido"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ClienteInput": {
+      "type": "object",
+      "required": ["ci", "nombre"],
+      "properties": {
+        "ci": {
+          "type": "string",
+          "example": "12345678",
+          "description": "Cédula de identidad del cliente"
+        },
+        "nombre": {
+          "type": "string",
+          "example": "María García",
+          "description": "Nombre completo del cliente"
+        },
+        "telefono": {
+          "type": "string",
+          "example": "+591 70123456",
+          "description": "Número de teléfono"
+        },
+        "correo": {
+          "type": "string",
+          "format": "email",
+          "example": "maria.garcia@email.com",
+          "description": "Correo electrónico"
+        },
+        "direccion": {
+          "type": "string",
+          "example": "Calle Los Álamos 456, La Paz",
+          "description": "Dirección física"
+        }
+      }
+    },
+    "PlanInput": {
+      "type": "object",
+      "required": ["nombre", "velocidad_mbps"],
+      "properties": {
+        "nombre": {
+          "type": "string",
+          "example": "Plan Hogar 20MB",
+          "description": "Nombre del plan"
+        },
+        "velocidad_mbps": {
+          "type": "integer",
+          "minimum": 1,
+          "example": 20,
+          "description": "Velocidad en Mbps"
+        },
+        "descripcion": {
+          "type": "string",
+          "example": "Plan residencial con 20 Mbps de velocidad",
+          "description": "Descripción del plan"
+        }
+      }
+    },
+    "ConexionInput": {
+      "type": "object",
+      "required": ["puerto_id", "cliente_id", "plan_id", "fecha_inicio"],
+      "properties": {
+        "puerto_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID del puerto a utilizar"
+        },
+        "cliente_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID del cliente"
+        },
+        "plan_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID del plan contratado"
+        },
+        "fecha_inicio": {
+          "type": "string",
+          "format": "date",
+          "example": "2023-09-28",
+          "description": "Fecha de inicio del servicio"
+        }
+      }
+    },
+    "PuertoInput": {
+      "type": "object",
+      "properties": {
+        "estado": {
+          "type": "string",
+          "enum": ["LIBRE", "OCUPADO", "MANTENIMIENTO"],
+          "description": "Estado del puerto"
+        },
+        "nota": {
+          "type": "string",
+          "description": "Nota adicional sobre el puerto"
+        }
+      }
+    },
+    "MantenimientoInput": {
+      "type": "object",
+      "required": ["nap_id", "tipo", "descripcion"],
+      "properties": {
+        "nap_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID del NAP a mantener"
+        },
+        "tipo": {
+          "type": "string",
+          "enum": ["PREVENTIVO", "CORRECTIVO"],
+          "description": "Tipo de mantenimiento"
+        },
+        "descripcion": {
+          "type": "string",
+          "example": "Limpieza y revisión de conexiones",
+          "description": "Descripción detallada del mantenimiento"
+        },
+        "fecha": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Fecha y hora del mantenimiento (opcional)"
+        }
+      }
+    },
+    "Mantenimiento": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nap_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tipo": {
+          "type": "string",
+          "enum": ["PREVENTIVO", "CORRECTIVO"],
+          "example": "PREVENTIVO"
+        },
+        "descripcion": {
+          "type": "string",
+          "example": "Limpieza y revisión de conexiones"
+        },
+        "fecha": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2023-09-28T10:30:00.000Z"
+        },
+        "realizado_por": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nap": {
+          "$ref": "#/definitions/NAP"
+        },
+        "usuario": {
+          "$ref": "#/definitions/Usuario"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "Auditoria": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "example": 1001
+        },
+        "tabla": {
+          "type": "string",
+          "example": "usuarios"
+        },
+        "registro_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "accion": {
+          "type": "string",
+          "enum": ["CREATE", "UPDATE", "DELETE"],
+          "example": "UPDATE"
+        },
+        "datos_anteriores": {
+          "type": "object",
+          "description": "Estado anterior del registro"
+        },
+        "datos_nuevos": {
+          "type": "object",
+          "description": "Estado nuevo del registro"
+        },
+        "cambiado_por": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "usuario": {
+          "$ref": "#/definitions/Usuario"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2023-09-28T10:30:00.000Z"
+        }
+      }
+    },
+    "ReporteConsumoCliente": {
+      "type": "object",
+      "properties": {
+        "cliente_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nombre": {
+          "type": "string",
+          "example": "María García"
+        },
+        "ci": {
+          "type": "string",
+          "example": "12345678"
+        },
+        "plan": {
+          "type": "string",
+          "example": "Plan Hogar 20MB"
+        },
+        "fecha_inicio": {
+          "type": "string",
+          "format": "date",
+          "example": "2023-08-15"
+        },
+        "estado_conexion": {
+          "type": "string",
+          "enum": ["ACTIVA", "SUSPENDIDA", "FINALIZADA"],
+          "example": "ACTIVA"
+        },
+        "dias_servicio": {
+          "type": "integer",
+          "example": 44
+        },
+        "nap_codigo": {
+          "type": "string",
+          "example": "NAP-001"
+        },
+        "puerto_numero": {
+          "type": "integer",
+          "example": 15
+        }
+      }
+    },
+    "ReporteTecnicoNAP": {
+      "type": "object",
+      "properties": {
+        "nap_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "codigo": {
+          "type": "string",
+          "example": "NAP-001"
+        },
+        "modelo": {
+          "type": "string",
+          "example": "Huawei MA5608T"
+        },
+        "estado": {
+          "type": "string",
+          "enum": ["ACTIVO", "MANTENIMIENTO", "SATURADO"],
+          "example": "ACTIVO"
+        },
+        "ubicacion": {
+          "type": "string",
+          "example": "Centro La Paz"
+        },
+        "total_puertos": {
+          "type": "integer",
+          "example": 24
+        },
+        "puertos_operativos": {
+          "type": "integer",
+          "example": 22
+        },
+        "puertos_mantenimiento": {
+          "type": "integer",
+          "example": 2
+        },
+        "ultimo_mantenimiento": {
+          "type": "string",
+          "format": "date",
+          "example": "2023-09-15"
+        },
+        "mantenimientos_mes": {
+          "type": "integer",
+          "example": 2
+        }
+      }
+    }
+  }
+}
