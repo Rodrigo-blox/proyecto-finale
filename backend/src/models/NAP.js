@@ -20,7 +20,7 @@ const NAP = sequelize.define('NAP', {
     type: DataTypes.STRING
   },
   estado: {
-    type: DataTypes.ENUM('ACTIVO', 'MANTENIMIENTO', 'SATURADO'),
+    type: DataTypes.ENUM('ACTIVO', 'MANTENIMIENTO', 'FUERA_SERVICIO'),
     allowNull: false,
     defaultValue: 'ACTIVO'
   },

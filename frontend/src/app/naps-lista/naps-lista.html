@@ -1,0 +1,237 @@
+<app-layout>
+  <div class="flex-1 flex flex-col">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200">
+      <div class="px-6 py-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-2xl font-semibold text-black">Gestión de NAPs</h1>
+            <p class="text-sm text-gray-600 mt-1">Administra todos los NAPs de la red</p>
+          </div>
+          <button
+            (click)="actualizarVista()"
+            [disabled]="isLoading()"
+            class="px-4 py-2 bg-black text-white text-sm rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            <span>Actualizar</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <main class="flex-1 p-6">
+      <!-- Filtros -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+        <div class="flex items-center space-x-4">
+          <!-- Search Input -->
+          <div class="flex-1">
+            <input
+              type="text"
+              [value]="busqueda()"
+              (input)="onBusquedaChange($event)"
+              placeholder="Buscar por código, modelo o ubicación..."
+              class="w-full px-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+            />
+          </div>
+
+          <!-- Status Filter -->
+          <select
+            [value]="filtroEstado()"
+            (change)="onFiltroEstadoChange($event)"
+            class="px-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+          >
+            <option value="">Todos los estados</option>
+            <option value="ACTIVO">Activos</option>
+            <option value="MANTENIMIENTO">En Mantenimiento</option>
+            <option value="FUERA_SERVICIO">Fuera de Servicio</option>
+          </select>
+
+          <button
+            (click)="limpiarFiltros()"
+            class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            Limpiar
+          </button>
+        </div>
+      </div>
+
+      <!-- Error Message -->
+      @if (error()) {
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p class="text-sm text-red-600">{{ error() }}</p>
+        </div>
+      }
+
+      <!-- Table -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modelo</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Puertos</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ocupación</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              @if (isLoading()) {
+                <tr>
+                  <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">
+                    Cargando...
+                  </td>
+                </tr>
+              } @else if (napsPaginados().length === 0) {
+                <tr>
+                  <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">
+                    No se encontraron NAPs
+                  </td>
+                </tr>
+              } @else {
+                @for (nap of napsPaginados(); track nap.id) {
+                  <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="flex items-center space-x-2">
+                        <span class="text-sm font-medium text-gray-900">{{ nap.codigo }}</span>
+                        <button
+                          (click)="copiarTexto(nap.codigo)"
+                          class="text-gray-400 hover:text-gray-600"
+                          title="Copiar código"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="flex items-center space-x-2">
+                        <span class="text-sm text-gray-900">{{ nap.modelo }}</span>
+                        <button
+                          (click)="copiarTexto(nap.modelo)"
+                          class="text-gray-400 hover:text-gray-600"
+                          title="Copiar modelo"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <span class="px-2 py-1 text-xs rounded-full {{ getEstadoBadgeClass(nap.estado) }}">
+                        {{ nap.estado }}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4">
+                      <div class="text-sm text-gray-900 max-w-xs truncate" [title]="nap.ubicacion">
+                        {{ nap.ubicacion }}
+                      </div>
+                      <div class="text-xs text-gray-500">
+                        {{ nap.coordenadas.latitud | number:'1.5-5' }}, {{ nap.coordenadas.longitud | number:'1.5-5' }}
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm text-gray-900">{{ nap.estadisticas.total_puertos }} puertos</div>
+                      <div class="text-xs text-gray-500">
+                        {{ nap.estadisticas.puertos_ocupados }} ocupados
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="flex items-center">
+                        <div class="w-24 bg-gray-200 rounded-full h-2 mr-2">
+                          <div
+                            class="h-2 rounded-full"
+                            [ngClass]="{
+                              'bg-green-500': nap.estadisticas.porcentaje_ocupacion < 70,
+                              'bg-orange-500': nap.estadisticas.porcentaje_ocupacion >= 70 && nap.estadisticas.porcentaje_ocupacion < 90,
+                              'bg-red-500': nap.estadisticas.porcentaje_ocupacion >= 90
+                            }"
+                            [style.width.%]="nap.estadisticas.porcentaje_ocupacion"
+                          ></div>
+                        </div>
+                        <span class="text-xs text-gray-600">{{ nap.estadisticas.porcentaje_ocupacion }}%</span>
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div class="flex items-center justify-end space-x-2">
+                        <button
+                          (click)="verDetalles(nap.id)"
+                          class="text-blue-600 hover:text-blue-900 transition-colors"
+                          title="Ver detalles"
+                        >
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                          </svg>
+                        </button>
+                        <button
+                          (click)="verEnMapa(nap)"
+                          class="text-gray-600 hover:text-gray-900 transition-colors"
+                          title="Ver en mapa"
+                        >
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        @if (totalPaginas() > 1) {
+          <div class="bg-white px-6 py-4 border-t border-gray-200">
+            <div class="flex items-center justify-between">
+              <div class="text-sm text-gray-600">
+                Mostrando {{ (paginaActual() - 1) * itemsPorPagina + 1 }} -
+                {{ Math.min(paginaActual() * itemsPorPagina, napsFiltrados().length) }}
+                de {{ napsFiltrados().length }} resultados
+              </div>
+              <div class="flex items-center space-x-2">
+                <button
+                  (click)="cambiarPagina(paginaActual() - 1)"
+                  [disabled]="paginaActual() === 1"
+                  class="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Anterior
+                </button>
+                @for (pagina of [].constructor(totalPaginas()); track $index) {
+                  <button
+                    (click)="cambiarPagina($index + 1)"
+                    [ngClass]="{
+                      'bg-black text-white': paginaActual() === $index + 1,
+                      'border border-gray-300 text-gray-700 hover:bg-gray-50': paginaActual() !== $index + 1
+                    }"
+                    class="px-3 py-1 rounded-md text-sm transition-colors"
+                  >
+                    {{ $index + 1 }}
+                  </button>
+                }
+                <button
+                  (click)="cambiarPagina(paginaActual() + 1)"
+                  [disabled]="paginaActual() === totalPaginas()"
+                  class="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </main>
+  </div>
+</app-layout>

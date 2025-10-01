@@ -24,10 +24,14 @@ const limiter = rateLimit({
 });
 
 app.use(helmet());
-app.use(limiter);
+// app.use(limiter);
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:4200',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
+  
 }));
 
 if (process.env.NODE_ENV === 'development') {
@@ -83,7 +87,7 @@ const iniciarServidor = async () => {
       console.log('✅ Modelos sincronizados');
 
       // Crear datos de prueba para auditoría
-      await crearDatosPruebaAuditoria();
+      // await crearDatosPruebaAuditoria();
     }
 
     app.listen(PORT, () => {

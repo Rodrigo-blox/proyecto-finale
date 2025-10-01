@@ -17,7 +17,7 @@ const Conexion = sequelize.define('Conexion', {
   },
   cliente_id: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true,
     references: {
       model: 'clientes',
       key: 'id'

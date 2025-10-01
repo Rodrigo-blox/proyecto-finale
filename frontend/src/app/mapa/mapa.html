@@ -4,7 +4,7 @@
     <div class="p-6">
       <div class="flex items-center space-x-2 mb-8">
         <div class="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-          <span class="text-white font-bold text-sm">R</span>
+          <span class="text-white font-bold text-sm">Rs</span>
         </div>
         <span class="text-xl font-semibold text-black">{{ user()?.nombre || 'Usuario' }}</span>
       </div>
@@ -31,7 +31,7 @@
           <span class="text-sm font-medium">Usuarios</span>
         </a>
 
-        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+        <a href="/naps" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
             <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"></path>
           </svg>
@@ -79,7 +79,7 @@
   <!-- Main Content -->
   <div class="flex-1 flex flex-col">
     <!-- Header -->
-    <header class="bg-white border-b border-gray-200">
+    <!-- <header class="bg-white border-b border-gray-200">
       <div class="px-6">
         <div class="flex justify-between items-center h-16">
           <div class="flex items-center">
@@ -90,48 +90,325 @@
           </div>
         </div>
       </div>
-    </header>
+    </header> -->
 
     <!-- Map Container -->
     <main class="flex-1 relative">
-      <div #mapContainer class="w-full h-full min-h-screen"></div>
+      <div #mapContainer class="w-full h-full min-h-screen z-10 map-container"></div>
 
-      <!-- Map Controls Panel -->
-      <div class="absolute top-4 right-4 bg-white rounded-lg shadow-lg border border-gray-200 p-4 w-64">
-        <h3 class="text-sm font-semibold text-gray-900 mb-3">Controles del Mapa</h3>
+      <!-- Control Panel (Left-aligned) -->
+      @if (!mostrarFormulario()) {
+        <div class="fixed top-4 left-72 bg-white rounded-[20px] shadow-lg border border-gray-200 p-4 z-20 max-w-3xl">
+          <div class="flex flex-col space-y-4">
+            <!-- Search and Filter Row -->
+            <div class="flex items-center space-x-3">
+              <!-- Search Input -->
+              <div class="flex-1">
+                <input
+                  type="text"
+                  [value]="busqueda()"
+                  (input)="onBusquedaChange($event)"
+                  placeholder="Buscar por código, modelo o ubicación..."
+                  class="w-full px-4 py-2 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent bg-gray-50"
+                />
+              </div>
 
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-gray-600">NAPs Activos</span>
-            <div class="flex items-center space-x-1">
-              <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span class="text-xs font-medium">78</span>
+              <!-- Status Filter -->
+              <select
+                [value]="filtroEstado()"
+                (change)="onFiltroEstadoChange($event)"
+                class="px-3 py-2 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent bg-gray-50 min-w-[140px]"
+              >
+                <option value="">Todos los estados</option>
+                <option value="ACTIVO">Activos</option>
+                <option value="MANTENIMIENTO">En Mantenimiento</option>
+                <option value="FUERA_SERVICIO">Fuera de Servicio</option>
+              </select>
+            </div>
+
+            <!-- Statistics and Actions Row -->
+            <div class="flex items-center justify-between">
+              <!-- Statistics with labels -->
+              <div class="flex items-center space-x-6 text-sm">
+                <div class="flex items-center space-x-2">
+                  <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span class="text-gray-700 font-medium">{{ estadisticas().activos }}</span>
+                  <span class="text-gray-500">Activos</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
+                  <span class="text-gray-700 font-medium">{{ estadisticas().mantenimiento }}</span>
+                  <span class="text-gray-500">Mantenimiento</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span class="text-gray-700 font-medium">{{ estadisticas().fueraServicio }}</span>
+                  <span class="text-gray-500">Fuera Servicio</span>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex items-center space-x-2">
+                <button
+                  (click)="actualizarVista()"
+                  [disabled]="isLoading()"
+                  class="px-3 py-2 bg-gray-100 text-gray-700 text-xs rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  title="Actualizar vista"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  <span>Actualizar</span>
+                </button>
+
+                <button
+                  (click)="limpiarFiltros()"
+                  class="px-3 py-2 bg-gray-100 text-gray-700 text-xs rounded-full hover:bg-gray-200 transition-colors flex items-center space-x-2"
+                  title="Limpiar filtros"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                  <span>Limpiar</span>
+                </button>
+
+                <!-- Add NAP Button -->
+                <button
+                  (click)="mostrarFormularioCreacion()"
+                  class="px-4 py-2 bg-black text-white text-xs rounded-full hover:bg-gray-800 transition-colors flex items-center space-x-2"
+                  title="Agregar nuevo NAP"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                  </svg>
+                  <span>Nuevo NAP</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-gray-600">En Mantenimiento</span>
-            <div class="flex items-center space-x-1">
-              <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
-              <span class="text-xs font-medium">5</span>
+          <!-- Error Message -->
+          @if (error()) {
+            <div class="mt-3 p-2 bg-red-50 border border-red-200 rounded-md">
+              <p class="text-xs text-red-600">{{ error() }}</p>
             </div>
-          </div>
+          }
+        </div>
+      }
 
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-gray-600">Fuera de Servicio</span>
-            <div class="flex items-center space-x-1">
-              <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-              <span class="text-xs font-medium">2</span>
+      <!-- Overlay de selección de punto (pequeño y no bloqueante) -->
+      @if (seleccionandoPunto()) {
+        <div class="fixed bottom-6 left-80 bg-white rounded-lg shadow-lg border-2 border-blue-200 p-4 z-40 max-w-xs">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h4 class="text-sm font-semibold text-gray-900">Seleccionar Punto</h4>
+              <p class="text-xs text-gray-600">Haz clic en el mapa</p>
+            </div>
+            <button
+              (click)="cancelarSeleccionPunto()"
+              class="text-gray-400 hover:text-gray-600 flex-shrink-0"
+              title="Cancelar"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- Modal/Formulario de creación -->
+      @if (mostrarFormulario()) {
+        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div class="bg-white rounded-lg shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+              <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-900">
+                  {{ editandoNAP() ? 'Editar NAP' : 'Crear Nuevo NAP' }}
+                </h2>
+                <button
+                  (click)="cerrarFormulario()"
+                  class="text-gray-400 hover:text-gray-600"
+                >
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+
+              <form (ngSubmit)="crearNAP()" class="space-y-4">
+                <!-- Código -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Código*</label>
+                  <input
+                    type="text"
+                    [value]="napForm().codigo"
+                    (input)="updateCodigo($event)"
+                    placeholder="NAP-001"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <!-- Modelo -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Modelo*</label>
+                  <input
+                    type="text"
+                    [value]="napForm().modelo"
+                    (input)="updateModelo($event)"
+                    placeholder="Huawei MA5608T"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <!-- Firmware -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Firmware*</label>
+                  <input
+                    type="text"
+                    [value]="napForm().firmware"
+                    (input)="updateFirmware($event)"
+                    placeholder="V800R017C10"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <!-- Estado -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Estado*</label>
+                  <select
+                    [value]="napForm().estado"
+                    (change)="updateEstado($event)"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    required
+                  >
+                    <option value="ACTIVO">Activo</option>
+                    <option value="MANTENIMIENTO">En Mantenimiento</option>
+                    <option value="FUERA_SERVICIO">Fuera de Servicio</option>
+                  </select>
+                </div>
+
+                <!-- Total Puertos -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Total Puertos*</label>
+                  <input
+                    type="number"
+                    [value]="napForm().total_puertos"
+                    (input)="updateTotalPuertos($event)"
+                    min="1"
+                    max="144"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <!-- Ubicación -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Ubicación*</label>
+                  <input
+                    type="text"
+                    [value]="napForm().ubicacion"
+                    (input)="updateUbicacion($event)"
+                    placeholder="Av. Siempre Viva 123, Springfield"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <!-- Coordenadas -->
+                <div class="space-y-3">
+                  <label class="block text-sm font-medium text-gray-700">Coordenadas*</label>
+
+                  <div class="flex space-x-2">
+                    <div class="flex-1">
+                      <label class="block text-xs text-gray-600 mb-1">Latitud</label>
+                      <input
+                        type="number"
+                        step="any"
+                        [value]="napForm().latitud"
+                        (input)="updateLatitud($event)"
+                        placeholder="-21.53549"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                        required
+                      />
+                    </div>
+                    <div class="flex-1">
+                      <label class="block text-xs text-gray-600 mb-1">Longitud</label>
+                      <input
+                        type="number"
+                        step="any"
+                        [value]="napForm().longitud"
+                        (input)="updateLongitud($event)"
+                        placeholder="-64.72956"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Botones de coordenadas -->
+                  <div class="flex space-x-2">
+                    <button
+                      type="button"
+                      (click)="activarSeleccionPunto()"
+                      class="flex-1 bg-blue-100 text-blue-700 text-xs py-2 px-3 rounded-md hover:bg-blue-200 transition-colors"
+                    >
+                      📍 Seleccionar en Mapa
+                    </button>
+
+                    @if (coordenadasSeleccionadas()) {
+                      <button
+                        type="button"
+                        (click)="usarCoordenadas()"
+                        class="flex-1 bg-green-100 text-green-700 text-xs py-2 px-3 rounded-md hover:bg-green-200 transition-colors"
+                      >
+                        ✅ Usar Coordenadas
+                      </button>
+                    }
+                  </div>
+
+                  @if (coordenadasSeleccionadas()) {
+                    <p class="text-xs text-green-600 text-center">
+                      ✅ Coordenadas seleccionadas: {{ coordenadasSeleccionadas()!.lat | number:'1.5-5' }}, {{ coordenadasSeleccionadas()!.lng | number:'1.5-5' }}
+                    </p>
+                  }
+                </div>
+
+                <!-- Botones del formulario -->
+                <div class="flex space-x-3 pt-4">
+                  <button
+                    type="button"
+                    (click)="cerrarFormulario()"
+                    class="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200 transition-colors text-sm"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    [disabled]="isLoading()"
+                    class="flex-1 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    @if (editandoNAP()) {
+                      {{ isLoading() ? 'Actualizando...' : 'Actualizar NAP' }}
+                    } @else {
+                      {{ isLoading() ? 'Creando...' : 'Crear NAP' }}
+                    }
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
-
-        <div class="mt-4 pt-3 border-t border-gray-200">
-          <button class="w-full bg-black text-white text-xs py-2 px-3 rounded-md hover:bg-gray-800 transition-colors">
-            Actualizar Vista
-          </button>
-        </div>
-      </div>
+      }
     </main>
   </div>
 </div>

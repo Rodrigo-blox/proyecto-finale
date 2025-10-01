@@ -1,0 +1,210 @@
+<app-layout>
+  <div class="p-6">
+    <!-- Header -->
+    <div class="mb-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900">Alertas del Sistema</h1>
+          <p class="text-gray-600 mt-1">Monitoreo y notificaciones de los NAPs</p>
+        </div>
+        <button
+          (click)="actualizarAlertas()"
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          Actualizar
+        </button>
+      </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <!-- Total Alertas -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600">Total de Alertas</p>
+            <p class="text-3xl font-bold text-gray-900 mt-2">{{ totalAlertas() }}</p>
+          </div>
+          <div class="p-3 bg-blue-100 rounded-full">
+            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alertas Críticas -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600">Alertas Críticas</p>
+            <p class="text-3xl font-bold text-red-600 mt-2">{{ alertasCriticas() }}</p>
+          </div>
+          <div class="p-3 bg-red-100 rounded-full">
+            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Advertencias -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600">Advertencias</p>
+            <p class="text-3xl font-bold text-yellow-600 mt-2">{{ alertasAdvertencia() }}</p>
+          </div>
+          <div class="p-3 bg-yellow-100 rounded-full">
+            <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="bg-white rounded-lg shadow p-4 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <!-- Búsqueda -->
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+          <input
+            type="text"
+            [value]="busqueda()"
+            (input)="actualizarBusqueda($event)"
+            placeholder="Buscar por mensaje o detalle..."
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        <!-- Filtro Nivel -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nivel</label>
+          <select
+            [value]="filtroNivel()"
+            (change)="cambiarFiltroNivel($event)"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="TODAS">Todas</option>
+            <option value="CRITICO">Crítico</option>
+            <option value="ADVERTENCIA">Advertencia</option>
+            <option value="INFO">Info</option>
+          </select>
+        </div>
+
+        <!-- Filtro Tipo -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+          <select
+            [value]="filtroTipo()"
+            (change)="cambiarFiltroTipo($event)"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="TODAS">Todas</option>
+            <option value="NAP_SATURADO">NAP Saturado</option>
+            <option value="NAP_MANTENIMIENTO">NAP en Mantenimiento</option>
+            <option value="NAP_PROXIMO_SATURACION">Próximo a Saturación</option>
+            <option value="MANTENIMIENTO_CORRECTIVO">Mantenimiento Correctivo</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Botón limpiar filtros -->
+      @if (filtroNivel() !== 'TODAS' || filtroTipo() !== 'TODAS' || busqueda()) {
+        <div class="mt-4">
+          <button
+            (click)="limpiarFiltros()"
+            class="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      }
+    </div>
+
+    <!-- Lista de Alertas -->
+    <div class="bg-white rounded-lg shadow">
+      @if (alertasFiltradas().length === 0) {
+        <div class="p-12 text-center">
+          <svg class="w-20 h-20 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">No hay alertas</h3>
+          <p class="text-gray-600">
+            @if (busqueda() || filtroNivel() !== 'TODAS' || filtroTipo() !== 'TODAS') {
+              No se encontraron alertas con los filtros seleccionados
+            } @else {
+              Todo está funcionando correctamente
+            }
+          </p>
+        </div>
+      } @else {
+        <div class="divide-y divide-gray-200">
+          @for (alerta of alertasFiltradas(); track alerta.nap_id + alerta.fecha) {
+            <div
+              (click)="irANAP(alerta.nap_id)"
+              class="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+            >
+              <div class="flex items-start gap-4">
+                <!-- Ícono -->
+                <div class="flex-shrink-0">
+                  <div class="w-12 h-12 rounded-full flex items-center justify-center text-2xl"
+                       [ngClass]="getColorBadge(alerta.nivel)">
+                    {{ getIcono(alerta.tipo) }}
+                  </div>
+                </div>
+
+                <!-- Contenido -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-start justify-between gap-4 mb-2">
+                    <div>
+                      <h3 class="text-lg font-semibold text-gray-900">
+                        {{ alerta.mensaje }}
+                      </h3>
+                      <p class="text-sm text-gray-600 mt-1">
+                        {{ alerta.detalle }}
+                      </p>
+                    </div>
+                    <span
+                      class="px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap"
+                      [ngClass]="getColorBadge(alerta.nivel)"
+                    >
+                      {{ alerta.nivel }}
+                    </span>
+                  </div>
+
+                  <div class="flex items-center gap-4 text-sm text-gray-500">
+                    <span class="flex items-center gap-1">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                      </svg>
+                      {{ getNombreTipo(alerta.tipo) }}
+                    </span>
+                    <span class="flex items-center gap-1">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      {{ alerta.fecha | date: 'dd/MM/yyyy HH:mm' }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Flecha -->
+                <div class="flex-shrink-0">
+                  <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</app-layout>

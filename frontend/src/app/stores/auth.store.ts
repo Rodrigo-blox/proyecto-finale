@@ -6,6 +6,7 @@ export interface User {
   id: string;
   correo: string;
   nombre?: string;
+  rol?: 'ADMIN' | 'SUPERVISOR' | 'TECNICO';
 }
 
 export interface AuthState {
@@ -28,6 +29,31 @@ export const AuthStore = signalStore(
   withComputed((store) => ({
     isAuthenticated: computed(() => !!store.token() && !!store.user()),
     isLoggedOut: computed(() => !store.token() || !store.user()),
+
+    // Role checks
+    isAdmin: computed(() => store.user()?.rol === 'ADMIN'),
+    isSupervisor: computed(() => store.user()?.rol === 'SUPERVISOR'),
+    isTecnico: computed(() => store.user()?.rol === 'TECNICO'),
+
+    // Permission checks
+    canManageUsers: computed(() => store.user()?.rol === 'ADMIN'),
+    canViewAuditoria: computed(() => ['ADMIN', 'SUPERVISOR'].includes(store.user()?.rol || '')),
+    canGenerateReports: computed(() => ['ADMIN', 'SUPERVISOR'].includes(store.user()?.rol || '')),
+    canCreateNAP: computed(() => ['ADMIN', 'SUPERVISOR'].includes(store.user()?.rol || '')),
+    canDeleteNAP: computed(() => ['ADMIN', 'SUPERVISOR'].includes(store.user()?.rol || '')),
+    canUpdateNAP: computed(() => ['ADMIN', 'SUPERVISOR', 'TECNICO'].includes(store.user()?.rol || '')),
+    canManageClients: computed(() => ['ADMIN', 'SUPERVISOR'].includes(store.user()?.rol || '')),
+    canViewClients: computed(() => !!store.user()?.rol),
+    canManagePlanes: computed(() => ['ADMIN', 'SUPERVISOR'].includes(store.user()?.rol || '')),
+    canViewPlanes: computed(() => !!store.user()?.rol),
+    canCreateConnections: computed(() => ['ADMIN', 'SUPERVISOR'].includes(store.user()?.rol || '')),
+    canFinalizeConnections: computed(() => ['ADMIN', 'SUPERVISOR'].includes(store.user()?.rol || '')),
+    canUpdateConnections: computed(() => ['ADMIN', 'SUPERVISOR', 'TECNICO'].includes(store.user()?.rol || '')),
+    canEditPorts: computed(() => ['ADMIN', 'TECNICO'].includes(store.user()?.rol || '')),
+    canViewPorts: computed(() => !!store.user()?.rol),
+    canManageMaintenances: computed(() => ['ADMIN', 'TECNICO'].includes(store.user()?.rol || '')),
+    canViewMaintenances: computed(() => !!store.user()?.rol),
+    canViewStatistics: computed(() => ['ADMIN', 'SUPERVISOR'].includes(store.user()?.rol || '')),
   })),
   withMethods((store) => {
     const router = inject(Router);

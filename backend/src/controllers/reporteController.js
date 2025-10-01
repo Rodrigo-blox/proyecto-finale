@@ -1,5 +1,43 @@
 const { NAP, Puerto, Cliente, Conexion, Plan, Mantenimiento, Usuario } = require('../models');
 const { Op } = require('sequelize');
+const PDFGenerator = require('../utils/pdfGenerator');
+const ExcelGenerator = require('../utils/excelGenerator');
+
+/**
+ * Helper para enviar reporte en el formato solicitado
+ */
+const enviarReporteEnFormato = async (res, datos, tipo, formato = 'json') => {
+  try {
+    switch (formato.toLowerCase()) {
+      case 'pdf':
+        const pdfBuffer = await PDFGenerator.generarPDF(datos, tipo);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.setHeader('Content-Disposition', `attachment; filename=reporte_${tipo}_${Date.now()}.pdf`);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        return res.end(pdfBuffer, 'binary');
+
+      case 'excel':
+      case 'xlsx':
+        const excelBuffer = await ExcelGenerator.generarExcel(datos, tipo);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Length', excelBuffer.length);
+        res.setHeader('Content-Disposition', `attachment; filename=reporte_${tipo}_${Date.now()}.xlsx`);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        return res.end(excelBuffer, 'binary');
+
+      case 'json':
+      default:
+        return res.json(datos);
+    }
+  } catch (error) {
+    console.error(`Error al generar reporte en formato ${formato}:`, error);
+    return res.status(500).json({
+      success: false,
+      message: `Error al generar el reporte en formato ${formato}`
+    });
+  }
+};
 
 const reporteOcupacionNAPs = async (req, res) => {
   try {
@@ -71,7 +109,7 @@ const reporteOcupacionNAPs = async (req, res) => {
       };
     });
 
-    res.json({
+    const resultado = {
       success: true,
       tipo: 'OCUPACION_NAPS',
       fecha_generacion: new Date(),
@@ -85,7 +123,9 @@ const reporteOcupacionNAPs = async (req, res) => {
           reporte.reduce((sum, n) => sum + n.estadisticas.porcentaje_ocupacion, 0) / reporte.length
         )
       }
-    });
+    };
+
+    return enviarReporteEnFormato(res, resultado, 'ocupacion_naps', formato);
   } catch (error) {
     console.error('Error al generar reporte de ocupación:', error);
     res.status(500).json({
@@ -97,7 +137,7 @@ const reporteOcupacionNAPs = async (req, res) => {
 
 const reporteConsumoPorCliente = async (req, res) => {
   try {
-    const { fecha_desde, fecha_hasta, cliente_id } = req.query;
+    const { fecha_desde, fecha_hasta, cliente_id, formato = 'json' } = req.query;
 
     let whereCondition = {};
     if (cliente_id) {
@@ -183,7 +223,7 @@ const reporteConsumoPorCliente = async (req, res) => {
       }
     }));
 
-    res.json({
+    const resultado = {
       success: true,
       tipo: 'CONSUMO_POR_CLIENTE',
       fecha_generacion: new Date(),
@@ -194,7 +234,9 @@ const reporteConsumoPorCliente = async (req, res) => {
         total_conexiones: reporte.reduce((sum, c) => sum + c.resumen.total_conexiones, 0),
         conexiones_activas: reporte.reduce((sum, c) => sum + c.resumen.conexiones_activas, 0)
       }
-    });
+    };
+
+    return enviarReporteEnFormato(res, resultado, 'consumo_cliente', formato);
   } catch (error) {
     console.error('Error al generar reporte de consumo:', error);
     res.status(500).json({
@@ -206,7 +248,7 @@ const reporteConsumoPorCliente = async (req, res) => {
 
 const reporteEstadoTecnico = async (req, res) => {
   try {
-    const { fecha_desde, fecha_hasta } = req.query;
+    const { fecha_desde, fecha_hasta, formato = 'json' } = req.query;
 
     let whereCondition = {};
     if (fecha_desde || fecha_hasta) {
@@ -296,16 +338,244 @@ const reporteEstadoTecnico = async (req, res) => {
       mantenimiento: reporte.filter(n => n.estado_tecnico === 'MANTENIMIENTO').length
     };
 
-    res.json({
+    const resultado = {
       success: true,
       tipo: 'ESTADO_TECNICO',
       fecha_generacion: new Date(),
       parametros: { fecha_desde, fecha_hasta },
       data: reporte,
       resumen: estadisticasGenerales
-    });
+    };
+
+    return enviarReporteEnFormato(res, resultado, 'estado_tecnico', formato);
   } catch (error) {
     console.error('Error al generar reporte técnico:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+};
+
+const reportePlanesPopulares = async (req, res) => {
+  try {
+    const { fecha_desde, fecha_hasta, formato = 'json' } = req.query;
+
+    let whereCondition = { estado: 'ACTIVA' };
+    if (fecha_desde || fecha_hasta) {
+      whereCondition.createdAt = {};
+      if (fecha_desde) {
+        whereCondition.createdAt[Op.gte] = new Date(fecha_desde);
+      }
+      if (fecha_hasta) {
+        whereCondition.createdAt[Op.lte] = new Date(fecha_hasta);
+      }
+    }
+
+    // Obtener todas las conexiones activas con planes
+    const conexiones = await Conexion.findAll({
+      where: whereCondition,
+      include: [{ model: Plan, as: 'plan' }]
+    });
+
+    // Agrupar por plan
+    const planesMap = new Map();
+
+    conexiones.forEach(conexion => {
+      const planId = conexion.plan.id;
+      if (!planesMap.has(planId)) {
+        planesMap.set(planId, {
+          plan: {
+            id: conexion.plan.id,
+            nombre: conexion.plan.nombre,
+            velocidad_mbps: conexion.plan.velocidad_mbps,
+            precio: conexion.plan.precio || 0
+          },
+          total_contrataciones: 0,
+          porcentaje: 0,
+          ingreso_estimado: 0
+        });
+      }
+
+      const planData = planesMap.get(planId);
+      planData.total_contrataciones++;
+      planData.ingreso_estimado += conexion.plan.precio || 0;
+    });
+
+    // Convertir a array y calcular porcentajes
+    const totalConexiones = conexiones.length;
+    const planesArray = Array.from(planesMap.values()).map(plan => ({
+      ...plan,
+      porcentaje: Math.round((plan.total_contrataciones / totalConexiones) * 100)
+    }));
+
+    // Ordenar por popularidad
+    planesArray.sort((a, b) => b.total_contrataciones - a.total_contrataciones);
+
+    // Calcular estadísticas
+    const velocidadPromedio = planesArray.reduce((sum, p) =>
+      sum + (p.plan.velocidad_mbps * p.total_contrataciones), 0) / totalConexiones;
+
+    const ingresoTotal = planesArray.reduce((sum, p) => sum + p.ingreso_estimado, 0);
+
+    const resultado = {
+      success: true,
+      tipo: 'PLANES_POPULARES',
+      fecha_generacion: new Date(),
+      parametros: { fecha_desde, fecha_hasta },
+      data: planesArray,
+      resumen: {
+        total_planes: planesArray.length,
+        total_conexiones: totalConexiones,
+        velocidad_promedio_mbps: Math.round(velocidadPromedio),
+        ingreso_mensual_estimado: `$${Math.round(ingresoTotal).toLocaleString()}`,
+        plan_mas_popular: planesArray[0]?.plan.nombre || 'N/A',
+        contrataciones_mas_popular: planesArray[0]?.total_contrataciones || 0,
+        plan_menos_popular: planesArray[planesArray.length - 1]?.plan.nombre || 'N/A',
+        contrataciones_menos_popular: planesArray[planesArray.length - 1]?.total_contrataciones || 0
+      }
+    };
+
+    return enviarReporteEnFormato(res, resultado, 'planes_populares', formato);
+  } catch (error) {
+    console.error('Error al generar reporte de planes populares:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+};
+
+const reporteTendenciasPlanes = async (req, res) => {
+  try {
+    const { meses = 6, formato = 'json' } = req.query;
+
+    // Calcular fechas para los últimos N meses
+    const fechaActual = new Date();
+    const resultados = [];
+
+    for (let i = parseInt(meses) - 1; i >= 0; i--) {
+      const fechaInicio = new Date(fechaActual.getFullYear(), fechaActual.getMonth() - i, 1);
+      const fechaFin = new Date(fechaActual.getFullYear(), fechaActual.getMonth() - i + 1, 0);
+
+      const conexiones = await Conexion.findAll({
+        where: {
+          createdAt: {
+            [Op.gte]: fechaInicio,
+            [Op.lte]: fechaFin
+          }
+        },
+        include: [{ model: Plan, as: 'plan' }]
+      });
+
+      // Agrupar por plan
+      const planesDelMes = {};
+      conexiones.forEach(conexion => {
+        const planNombre = conexion.plan.nombre;
+        if (!planesDelMes[planNombre]) {
+          planesDelMes[planNombre] = 0;
+        }
+        planesDelMes[planNombre]++;
+      });
+
+      resultados.push({
+        mes: fechaInicio.toISOString().substring(0, 7), // YYYY-MM
+        total_nuevas_conexiones: conexiones.length,
+        planes: planesDelMes
+      });
+    }
+
+    const resultado = {
+      success: true,
+      tipo: 'TENDENCIAS_PLANES',
+      fecha_generacion: new Date(),
+      parametros: { meses },
+      data: resultados,
+      resumen: {
+        total_meses: resultados.length,
+        conexiones_totales: resultados.reduce((sum, m) => sum + m.total_nuevas_conexiones, 0),
+        promedio_mensual: Math.round(
+          resultados.reduce((sum, m) => sum + m.total_nuevas_conexiones, 0) / resultados.length
+        )
+      }
+    };
+
+    return enviarReporteEnFormato(res, resultado, 'tendencias_planes', formato);
+  } catch (error) {
+    console.error('Error al generar reporte de tendencias:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+};
+
+const reporteAnalisisVelocidades = async (req, res) => {
+  try {
+    const { fecha_desde, fecha_hasta, formato = 'json' } = req.query;
+
+    let whereCondition = { estado: 'ACTIVA' };
+    if (fecha_desde || fecha_hasta) {
+      whereCondition.createdAt = {};
+      if (fecha_desde) {
+        whereCondition.createdAt[Op.gte] = new Date(fecha_desde);
+      }
+      if (fecha_hasta) {
+        whereCondition.createdAt[Op.lte] = new Date(fecha_hasta);
+      }
+    }
+
+    const conexiones = await Conexion.findAll({
+      where: whereCondition,
+      include: [{ model: Plan, as: 'plan' }]
+    });
+
+    // Agrupar por rangos de velocidad
+    const rangos = {
+      '0-20': { rango: '0-20 Mbps', cantidad: 0, porcentaje: 0 },
+      '21-50': { rango: '21-50 Mbps', cantidad: 0, porcentaje: 0 },
+      '51-100': { rango: '51-100 Mbps', cantidad: 0, porcentaje: 0 },
+      '101-200': { rango: '101-200 Mbps', cantidad: 0, porcentaje: 0 },
+      '201+': { rango: '201+ Mbps', cantidad: 0, porcentaje: 0 }
+    };
+
+    conexiones.forEach(conexion => {
+      const velocidad = conexion.plan.velocidad_mbps;
+      if (velocidad <= 20) rangos['0-20'].cantidad++;
+      else if (velocidad <= 50) rangos['21-50'].cantidad++;
+      else if (velocidad <= 100) rangos['51-100'].cantidad++;
+      else if (velocidad <= 200) rangos['101-200'].cantidad++;
+      else rangos['201+'].cantidad++;
+    });
+
+    // Calcular porcentajes
+    const total = conexiones.length;
+    Object.keys(rangos).forEach(key => {
+      rangos[key].porcentaje = Math.round((rangos[key].cantidad / total) * 100);
+    });
+
+    // Calcular velocidad promedio
+    const velocidadPromedio = conexiones.reduce((sum, c) =>
+      sum + c.plan.velocidad_mbps, 0) / total;
+
+    const resultado = {
+      success: true,
+      tipo: 'ANALISIS_VELOCIDADES',
+      fecha_generacion: new Date(),
+      parametros: { fecha_desde, fecha_hasta },
+      data: Object.values(rangos),
+      resumen: {
+        total_conexiones: total,
+        velocidad_promedio_mbps: Math.round(velocidadPromedio),
+        velocidad_minima_mbps: Math.min(...conexiones.map(c => c.plan.velocidad_mbps)),
+        velocidad_maxima_mbps: Math.max(...conexiones.map(c => c.plan.velocidad_mbps)),
+        rango_mas_popular: Object.values(rangos).sort((a, b) => b.cantidad - a.cantidad)[0].rango
+      }
+    };
+
+    return enviarReporteEnFormato(res, resultado, 'analisis_velocidades', formato);
+  } catch (error) {
+    console.error('Error al generar reporte de velocidades:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
@@ -320,19 +590,49 @@ const obtenerTiposReporte = async (req, res) => {
         id: 'ocupacion',
         nombre: 'Reporte de Ocupación por NAP',
         descripcion: 'Muestra el estado de ocupación de puertos por cada NAP',
-        parametros: ['fecha_desde', 'fecha_hasta']
+        categoria: 'Infraestructura',
+        parametros: ['fecha_desde', 'fecha_hasta'],
+        formatos: ['json', 'pdf', 'excel']
       },
       {
         id: 'consumo',
         nombre: 'Reporte de Consumo por Cliente',
         descripcion: 'Detalle del consumo y conexiones por cliente',
-        parametros: ['fecha_desde', 'fecha_hasta', 'cliente_id']
+        categoria: 'Clientes',
+        parametros: ['fecha_desde', 'fecha_hasta', 'cliente_id'],
+        formatos: ['json', 'pdf', 'excel']
       },
       {
         id: 'tecnico',
         nombre: 'Reporte de Estado Técnico',
         descripcion: 'Estado técnico y mantenimientos de los NAPs',
-        parametros: ['fecha_desde', 'fecha_hasta']
+        categoria: 'Infraestructura',
+        parametros: ['fecha_desde', 'fecha_hasta'],
+        formatos: ['json', 'pdf', 'excel']
+      },
+      {
+        id: 'planes-populares',
+        nombre: 'Planes Más Populares',
+        descripcion: 'Ranking de planes por cantidad de contrataciones e ingresos',
+        categoria: 'Comercial',
+        parametros: ['fecha_desde', 'fecha_hasta'],
+        formatos: ['json', 'pdf', 'excel']
+      },
+      {
+        id: 'tendencias-planes',
+        nombre: 'Tendencias de Contratación',
+        descripcion: 'Evolución de contrataciones por plan en los últimos meses',
+        categoria: 'Comercial',
+        parametros: ['meses'],
+        formatos: ['json', 'pdf', 'excel']
+      },
+      {
+        id: 'analisis-velocidades',
+        nombre: 'Análisis de Velocidades',
+        descripcion: 'Distribución de clientes por rangos de velocidad',
+        categoria: 'Comercial',
+        parametros: ['fecha_desde', 'fecha_hasta'],
+        formatos: ['json', 'pdf', 'excel']
       }
     ];
 
@@ -352,5 +652,8 @@ module.exports = {
   reporteOcupacionNAPs,
   reporteConsumoPorCliente,
   reporteEstadoTecnico,
+  reportePlanesPopulares,
+  reporteTendenciasPlanes,
+  reporteAnalisisVelocidades,
   obtenerTiposReporte
 };

@@ -263,13 +263,16 @@ const actualizarConexion = async (req, res) => {
       plan_id: plan_id || conexion.plan_id,
       fecha_fin,
       estado: estado || conexion.estado
-    });
+    }, { userId: req.usuario?.id });
 
+    // Actualizar el estado del puerto según el estado de la conexión
     if (estado && estado !== estadoAnterior) {
-      if (estado === 'FINALIZADA' || estado === 'SUSPENDIDA') {
-        await conexion.puerto.update({ estado: 'LIBRE' });
-      } else if (estado === 'ACTIVA' && estadoAnterior !== 'ACTIVA') {
-        await conexion.puerto.update({ estado: 'OCUPADO' });
+      if (estado === 'FINALIZADA') {
+        // Solo liberar el puerto cuando la conexión se finaliza
+        await conexion.puerto.update({ estado: 'LIBRE' }, { userId: req.usuario?.id });
+      } else if (estado === 'ACTIVA' || estado === 'SUSPENDIDA') {
+        // ACTIVA y SUSPENDIDA mantienen el puerto ocupado
+        await conexion.puerto.update({ estado: 'OCUPADO' }, { userId: req.usuario?.id });
       }
     }
 

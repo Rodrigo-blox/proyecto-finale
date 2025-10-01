@@ -194,37 +194,66 @@ const actualizarCliente = async (req, res) => {
 };
 
 const eliminarCliente = async (req, res) => {
+  const sequelize = require('../config/database');
+  const transaction = await sequelize.transaction();
+  // Pasar userId para auditoría
+  transaction.userId = req.usuario?.id;
+
   try {
     const { id } = req.params;
 
     const cliente = await Cliente.findByPk(id, {
-      include: [{ model: Conexion, as: 'conexiones' }]
+      include: [{
+        model: Conexion,
+        as: 'conexiones',
+        include: [{ model: Puerto, as: 'puerto' }]
+      }],
+      transaction
     });
 
     if (!cliente) {
+      await transaction.rollback();
       return res.status(404).json({
         success: false,
         message: 'Cliente no encontrado'
       });
     }
 
+    // Finalizar todas las conexiones activas del cliente y liberar puertos
     if (cliente.conexiones && cliente.conexiones.length > 0) {
       const conexionesActivas = cliente.conexiones.filter(c => c.estado === 'ACTIVA');
-      if (conexionesActivas.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'No se puede eliminar el cliente porque tiene conexiones activas'
-        });
+
+      for (const conexion of conexionesActivas) {
+        // Finalizar la conexión
+        await conexion.update({
+          estado: 'FINALIZADA',
+          fecha_fin: new Date()
+        }, { transaction });
+
+        // Liberar el puerto si existe
+        if (conexion.puerto) {
+          await conexion.puerto.update({
+            estado: 'LIBRE'
+          }, { transaction });
+        }
       }
     }
 
-    await cliente.destroy();
+    // Eliminar el cliente
+    await cliente.destroy({ transaction });
+
+    await transaction.commit();
 
     res.json({
       success: true,
-      message: 'Cliente eliminado exitosamente'
+      message: 'Cliente eliminado exitosamente',
+      data: {
+        cliente_id: id,
+        conexiones_finalizadas: cliente.conexiones ? cliente.conexiones.filter(c => c.estado === 'ACTIVA').length : 0
+      }
     });
   } catch (error) {
+    await transaction.rollback();
     console.error('Error al eliminar cliente:', error);
     res.status(500).json({
       success: false,

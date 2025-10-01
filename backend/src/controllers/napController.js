@@ -15,7 +15,7 @@ const obtenerNAPs = async (req, res) => {
       whereClause[Op.or] = [
         { codigo: { [Op.iLike]: `%${busqueda}%` } },
         { modelo: { [Op.iLike]: `%${busqueda}%` } },
-        { ubicacion: { [Op.iLike]: `%${busqueda}%` } }
+        { ubicacion: { [Op.iLike]: `%${busqueda}%` } },
       ];
     }
 
@@ -91,6 +91,11 @@ const obtenerNAPPorId = async (req, res) => {
               model: Conexion,
               as: 'conexion',
               required: false,
+              where: {
+                estado: {
+                  [Op.in]: ['ACTIVA', 'SUSPENDIDA']
+                }
+              },
               include: [
                 { model: Cliente, as: 'cliente' },
                 { model: Plan, as: 'plan' }
@@ -124,7 +129,7 @@ const crearNAP = async (req, res) => {
   try {
     const napData = req.body;
 
-    const nap = await NAP.create(napData);
+    const nap = await NAP.create(napData, { userId: req.usuario?.id });
 
     const puertos = [];
     for (let i = 1; i <= napData.total_puertos; i++) {
@@ -135,7 +140,7 @@ const crearNAP = async (req, res) => {
       });
     }
 
-    await Puerto.bulkCreate(puertos);
+    await Puerto.bulkCreate(puertos, { userId: req.usuario?.id });
 
     const napCompleto = await NAP.findByPk(nap.id, {
       include: [{ model: Puerto, as: 'puertos' }]
@@ -175,7 +180,7 @@ const actualizarNAP = async (req, res) => {
       });
     }
 
-    await nap.update(datosActualizacion);
+    await nap.update(datosActualizacion, { userId: req.usuario?.id });
 
     const napActualizado = await NAP.findByPk(id, {
       include: [{ model: Puerto, as: 'puertos' }]

@@ -33,6 +33,18 @@ Mantenimiento.belongsTo(Usuario, { foreignKey: 'realizado_por', as: 'tecnico' })
 Usuario.hasMany(Auditoria, { foreignKey: 'cambiado_por', as: 'auditorias' });
 Auditoria.belongsTo(Usuario, { foreignKey: 'cambiado_por', as: 'usuario' });
 
+// Configurar hooks de auditoría
+const { configurarAuditoriaParaModelo } = require('../utils/auditoria');
+
+// Auditar modelos importantes
+configurarAuditoriaParaModelo(NAP, 'naps');
+configurarAuditoriaParaModelo(Puerto, 'puertos');
+configurarAuditoriaParaModelo(Cliente, 'clientes');
+configurarAuditoriaParaModelo(Plan, 'planes');
+configurarAuditoriaParaModelo(Conexion, 'conexiones');
+configurarAuditoriaParaModelo(Usuario, 'usuarios');
+configurarAuditoriaParaModelo(Mantenimiento, 'mantenimientos');
+
 module.exports = {
   sequelize,
   Usuario,

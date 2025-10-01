@@ -1,0 +1,340 @@
+<app-layout>
+  <div class="p-6">
+    <!-- Header -->
+    <div class="mb-6">
+      <h1 class="text-3xl font-bold text-gray-900">Reportes y Análisis</h1>
+      <p class="text-gray-600 mt-1">Genera reportes detallados sobre tu infraestructura y operación</p>
+    </div>
+
+    <!-- Vista: Selección de Reporte -->
+    @if (!reporteSeleccionado()) {
+      <!-- Filtro por categoría -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Filtrar por categoría</label>
+        <select
+          [value]="categoriaSeleccionada()"
+          (change)="cambiarCategoria($event)"
+          class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="TODAS">Todas las categorías</option>
+          <option value="Infraestructura">Infraestructura</option>
+          <option value="Clientes">Clientes</option>
+          <option value="Comercial">Comercial</option>
+        </select>
+      </div>
+
+      <!-- Grid de reportes disponibles -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        @for (tipo of tiposFiltrados(); track tipo.id) {
+          <div
+            (click)="seleccionarReporte(tipo)"
+            class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-blue-500 p-6"
+          >
+            <div class="flex items-start justify-between mb-4">
+              <div class="text-4xl">
+                {{ getIconoCategoria(tipo.categoria) }}
+              </div>
+              <span
+                class="px-3 py-1 text-xs font-semibold rounded-full"
+                [ngClass]="getColorCategoria(tipo.categoria)"
+              >
+                {{ tipo.categoria }}
+              </span>
+            </div>
+
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">
+              {{ tipo.nombre }}
+            </h3>
+
+            <p class="text-sm text-gray-600 mb-4">
+              {{ tipo.descripcion }}
+            </p>
+
+            <div class="flex items-center gap-2 text-xs text-gray-500">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              <span>Formatos: PDF, Excel, JSON</span>
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (tiposFiltrados().length === 0) {
+        <div class="text-center py-12">
+          <p class="text-gray-500">No hay reportes disponibles en esta categoría</p>
+        </div>
+      }
+    }
+
+    <!-- Vista: Generación de Reporte -->
+    @if (reporteSeleccionado() && !resultadoReporte()) {
+      <div class="max-w-3xl mx-auto">
+        <!-- Botón volver -->
+        <button
+          (click)="volver()"
+          class="mb-6 flex items-center gap-2 text-gray-600 hover:text-gray-900"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+          Volver a la lista
+        </button>
+
+        <!-- Card del reporte seleccionado -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <h2 class="text-2xl font-bold text-gray-900 mb-2">
+                {{ reporteSeleccionado()?.nombre }}
+              </h2>
+              <p class="text-gray-600">
+                {{ reporteSeleccionado()?.descripcion }}
+              </p>
+            </div>
+            <span
+              class="px-3 py-1 text-xs font-semibold rounded-full"
+              [ngClass]="getColorCategoria(reporteSeleccionado()!.categoria)"
+            >
+              {{ reporteSeleccionado()?.categoria }}
+            </span>
+          </div>
+
+          <!-- Formulario de parámetros -->
+          <div class="space-y-4 mt-6">
+            <h3 class="text-lg font-semibold text-gray-900">Parámetros del Reporte</h3>
+
+            @if (necesitaParametro('fecha_desde')) {
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Desde</label>
+                <input
+                  type="date"
+                  [value]="parametros().fecha_desde"
+                  (input)="actualizarParametro('fecha_desde', $event)"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            }
+
+            @if (necesitaParametro('fecha_hasta')) {
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Hasta</label>
+                <input
+                  type="date"
+                  [value]="parametros().fecha_hasta"
+                  (input)="actualizarParametro('fecha_hasta', $event)"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            }
+
+            @if (necesitaParametro('meses')) {
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad de Meses</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="24"
+                  [value]="parametros().meses"
+                  (input)="actualizarParametro('meses', $event)"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            }
+
+            @if (necesitaParametro('cliente_id')) {
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">ID Cliente (opcional)</label>
+                <input
+                  type="text"
+                  [value]="parametros().cliente_id"
+                  (input)="actualizarParametro('cliente_id', $event)"
+                  placeholder="Dejar vacío para todos los clientes"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            }
+          </div>
+
+          <!-- Botones de acción -->
+          <div class="flex gap-4 mt-6">
+            <button
+              (click)="generarReporte()"
+              [disabled]="isLoading()"
+              class="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors flex items-center justify-center gap-2"
+            >
+              @if (isLoading()) {
+                <svg class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Generando...
+              } @else {
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                Ver Reporte
+              }
+            </button>
+
+            <button
+              (click)="descargarPDF()"
+              [disabled]="isLoading()"
+              class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition-colors flex items-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+              </svg>
+              PDF
+            </button>
+
+            <button
+              (click)="descargarExcel()"
+              [disabled]="isLoading()"
+              class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors flex items-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              Excel
+            </button>
+
+            <button
+              (click)="descargarJSON()"
+              [disabled]="isLoading()"
+              class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 transition-colors flex items-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+              </svg>
+              JSON
+            </button>
+          </div>
+
+          @if (error()) {
+            <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+              {{ error() }}
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Vista: Resultado del Reporte -->
+    @if (resultadoReporte()) {
+      <div class="max-w-7xl mx-auto">
+        <!-- Botón volver -->
+        <button
+          (click)="volver()"
+          class="mb-6 flex items-center gap-2 text-gray-600 hover:text-gray-900"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+          Generar otro reporte
+        </button>
+
+        <!-- Encabezado del reporte -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <h2 class="text-2xl font-bold text-gray-900 mb-2">
+                {{ reporteSeleccionado()?.nombre }}
+              </h2>
+              <p class="text-sm text-gray-600">
+                Generado el: {{ resultadoReporte()?.fecha_generacion | date: 'dd/MM/yyyy HH:mm' }}
+              </p>
+            </div>
+            <div class="flex gap-2">
+              <button
+                (click)="descargarPDF()"
+                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+                PDF
+              </button>
+
+              <button
+                (click)="descargarExcel()"
+                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Excel
+              </button>
+
+              <button
+                (click)="descargarJSON()"
+                class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                JSON
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resumen -->
+        @if (resultadoReporte()?.resumen) {
+          <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Resumen Ejecutivo</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              @for (key of Object.keys(resultadoReporte()!.resumen); track key) {
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                  <p class="text-sm text-gray-600 mb-1">{{ formatearKey(key) }}</p>
+                  <p class="text-2xl font-bold text-gray-900">
+                    {{ formatearValor(resultadoReporte()!.resumen[key]) }}
+                  </p>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Datos del reporte -->
+        <div class="bg-white rounded-lg shadow p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Datos Detallados</h3>
+          <div class="overflow-x-auto">
+            @if (resultadoReporte()?.data && resultadoReporte()!.data.length > 0) {
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    @for (columna of obtenerColumnas(resultadoReporte()!.data); track columna) {
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {{ formatearKey(columna) }}
+                      </th>
+                    }
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  @for (fila of resultadoReporte()!.data; track $index) {
+                    <tr class="hover:bg-gray-50">
+                      @for (columna of obtenerColumnas(resultadoReporte()!.data); track columna) {
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {{ formatearValorCelda(obtenerValorAnidado(fila, columna)) }}
+                        </td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+
+              @if (resultadoReporte()!.data.length > 10) {
+                <p class="text-center text-sm text-gray-500 mt-4">
+                  Mostrando {{ resultadoReporte()!.data.length }} registros
+                </p>
+              }
+            } @else {
+              <p class="text-center text-gray-500 py-8">No hay datos disponibles</p>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</app-layout>

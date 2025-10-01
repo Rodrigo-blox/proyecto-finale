@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
@@ -74,12 +74,31 @@ export interface NAPFiltros {
   pagina?: number;
 }
 
+export interface CreateNAPData {
+  codigo: string;
+  modelo: string;
+  firmware: string;
+  estado: 'ACTIVO' | 'MANTENIMIENTO' | 'FUERA_SERVICIO';
+  total_puertos: number;
+  ubicacion: string;
+  latitud: number;
+  longitud: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class NAPService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = environment.apiUrl || 'http://localhost:3000/api/v1';
+
+  private getAuthHeaders(): HttpHeaders {
+    const token = localStorage.getItem('token');
+    return new HttpHeaders({
+      'Authorization': token ? `Bearer ${token}` : '',
+      'Content-Type': 'application/json'
+    });
+  }
 
   obtenerNAPs(filtros?: NAPFiltros): Observable<NAPResponse> {
     let params = new HttpParams();
@@ -100,14 +119,33 @@ export class NAPService {
       params = params.set('pagina', filtros.pagina.toString());
     }
 
-    return this.http.get<NAPResponse>(`${this.baseUrl}/naps`, { params });
+    return this.http.get<NAPResponse>(`${this.baseUrl}/naps`, {
+      params,
+      headers: this.getAuthHeaders()
+    });
   }
 
   obtenerNAPsParaMapa(): Observable<NAPMapaResponse> {
-    return this.http.get<NAPMapaResponse>(`${this.baseUrl}/naps/mapa`);
+    return this.http.get<NAPMapaResponse>(`${this.baseUrl}/naps/mapa`, {
+      headers: this.getAuthHeaders()
+    });
   }
 
   obtenerNAPPorId(id: string): Observable<{ success: boolean; data: NAP }> {
-    return this.http.get<{ success: boolean; data: NAP }>(`${this.baseUrl}/naps/${id}`);
+    return this.http.get<{ success: boolean; data: NAP }>(`${this.baseUrl}/naps/${id}`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  crearNAP(napData: CreateNAPData): Observable<{ success: boolean; data: NAP; message: string }> {
+    return this.http.post<{ success: boolean; data: NAP; message: string }>(`${this.baseUrl}/naps`, napData, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  actualizarNAP(id: string, napData: CreateNAPData): Observable<{ success: boolean; data: NAP; message: string }> {
+    return this.http.put<{ success: boolean; data: NAP; message: string }>(`${this.baseUrl}/naps/${id}`, napData, {
+      headers: this.getAuthHeaders()
+    });
   }
 }

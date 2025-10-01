@@ -1,5 +1,6 @@
 const { Auditoria, Usuario } = require('../models');
 const { Op } = require('sequelize');
+const ExcelJS = require('exceljs');
 
 const registrarCambio = async (tabla, registro_id, accion, datos_anteriores, datos_nuevos, usuario_id) => {
   try {
@@ -304,10 +305,157 @@ const obtenerTablasAuditadas = async (req, res) => {
   }
 };
 
+const exportarAExcel = async (req, res) => {
+  try {
+    const {
+      tabla,
+      registro_id,
+      accion,
+      usuario_id,
+      fecha_desde,
+      fecha_hasta
+    } = req.query;
+
+    let whereCondition = {};
+
+    if (tabla) {
+      whereCondition.tabla = tabla;
+    }
+
+    if (registro_id) {
+      whereCondition.registro_id = registro_id;
+    }
+
+    if (accion) {
+      whereCondition.accion = accion;
+    }
+
+    if (usuario_id) {
+      whereCondition.cambiado_por = usuario_id;
+    }
+
+    if (fecha_desde || fecha_hasta) {
+      whereCondition.fecha = {};
+      if (fecha_desde) {
+        whereCondition.fecha[Op.gte] = new Date(fecha_desde);
+      }
+      if (fecha_hasta) {
+        whereCondition.fecha[Op.lte] = new Date(fecha_hasta);
+      }
+    }
+
+    const auditorias = await Auditoria.findAll({
+      where: whereCondition,
+      include: [{
+        model: Usuario,
+        as: 'usuario',
+        attributes: ['id', 'nombre', 'correo', 'rol']
+      }],
+      order: [['fecha', 'DESC']],
+      limit: 10000
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Auditoría');
+
+    worksheet.columns = [
+      { header: 'ID', key: 'id', width: 10 },
+      { header: 'Fecha', key: 'fecha', width: 20 },
+      { header: 'Tabla', key: 'tabla', width: 15 },
+      { header: 'Registro ID', key: 'registro_id', width: 40 },
+      { header: 'Acción', key: 'accion', width: 12 },
+      { header: 'Usuario', key: 'usuario_nombre', width: 25 },
+      { header: 'Correo Usuario', key: 'usuario_correo', width: 30 },
+      { header: 'Rol Usuario', key: 'usuario_rol', width: 15 },
+      { header: 'Cambios', key: 'cambios', width: 60 }
+    ];
+
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF000000' }
+    };
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+    auditorias.forEach(auditoria => {
+      let datos_anteriores = null;
+      let datos_nuevos = null;
+
+      try {
+        datos_anteriores = auditoria.datos_anteriores ? JSON.parse(auditoria.datos_anteriores) : null;
+      } catch (e) {
+        datos_anteriores = auditoria.datos_anteriores;
+      }
+
+      try {
+        datos_nuevos = auditoria.datos_nuevos ? JSON.parse(auditoria.datos_nuevos) : null;
+      } catch (e) {
+        datos_nuevos = auditoria.datos_nuevos;
+      }
+
+      let cambiosTexto = '';
+      if (auditoria.accion === 'CREATE') {
+        cambiosTexto = 'Registro creado';
+      } else if (auditoria.accion === 'DELETE') {
+        cambiosTexto = 'Registro eliminado';
+      } else if (auditoria.accion === 'UPDATE' && datos_anteriores && datos_nuevos) {
+        const cambios = [];
+        Object.keys(datos_nuevos).forEach(campo => {
+          if (datos_anteriores[campo] !== datos_nuevos[campo]) {
+            cambios.push(`${campo}: ${datos_anteriores[campo]} → ${datos_nuevos[campo]}`);
+          }
+        });
+        cambiosTexto = cambios.join(' | ');
+      }
+
+      worksheet.addRow({
+        id: auditoria.id,
+        fecha: new Date(auditoria.fecha).toLocaleString('es-ES'),
+        tabla: auditoria.tabla,
+        registro_id: auditoria.registro_id,
+        accion: auditoria.accion,
+        usuario_nombre: auditoria.usuario?.nombre || 'N/A',
+        usuario_correo: auditoria.usuario?.correo || 'N/A',
+        usuario_rol: auditoria.usuario?.rol || 'N/A',
+        cambios: cambiosTexto
+      });
+    });
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+        });
+      }
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=auditoria_${Date.now()}.xlsx`);
+    res.setHeader('Content-Length', buffer.length);
+
+    return res.end(buffer, 'binary');
+  } catch (error) {
+    console.error('Error al exportar auditoría a Excel:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar el archivo Excel'
+    });
+  }
+};
+
 module.exports = {
   registrarCambio,
   obtenerHistorialCambios,
   obtenerHistorialPorRegistro,
   obtenerEstadisticasAuditoria,
-  obtenerTablasAuditadas
+  obtenerTablasAuditadas,
+  exportarAExcel
 };

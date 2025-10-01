@@ -1,0 +1,771 @@
+<app-layout>
+
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col">
+    @if (isLoading()) {
+      <div class="flex-1 flex items-center justify-center">
+        <div class="text-center">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto mb-4"></div>
+          <p class="text-gray-600">Cargando detalles...</p>
+        </div>
+      </div>
+    } @else if (error()) {
+      <div class="flex-1 flex items-center justify-center p-6">
+        <div class="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+          <p class="text-red-600">{{ error() }}</p>
+          <button
+            (click)="volver()"
+            class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Volver a la lista
+          </button>
+        </div>
+      </div>
+    } @else if (nap()) {
+      <!-- Header -->
+      <header class="bg-white border-b border-gray-200">
+        <div class="px-6 py-4">
+          <div class="flex justify-between items-start">
+            <div class="flex items-start space-x-4">
+              <button
+                (click)="volver()"
+                class="mt-1 text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+              </button>
+              <div>
+                <div class="flex items-center space-x-3 mb-2">
+                  <h1 class="text-2xl font-semibold text-black">{{ nap()!.codigo }}</h1>
+                  <span class="px-3 py-1 text-sm rounded-full {{ getEstadoNAPBadgeClass(nap()!.estado) }}">
+                    {{ nap()!.estado }}
+                  </span>
+                </div>
+                <p class="text-sm text-gray-600">{{ nap()!.modelo }} • {{ nap()!.firmware }}</p>
+                <p class="text-sm text-gray-500 mt-1">📍 {{ nap()!.ubicacion }}</p>
+              </div>
+            </div>
+            <button
+              (click)="verEnMapa()"
+              class="px-4 py-2 bg-black text-white text-sm rounded-lg hover:bg-gray-800 transition-colors flex items-center space-x-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              <span>Ver en Mapa</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content -->
+      <main class="flex-1 p-6">
+        <!-- Estadísticas -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-600">Total Puertos</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ estadisticas().total }}</p>
+              </div>
+              <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-600">Libres</p>
+                <p class="text-2xl font-semibold text-green-600">{{ estadisticas().libres }}</p>
+              </div>
+              <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-600">Ocupados</p>
+                <p class="text-2xl font-semibold text-blue-600">{{ estadisticas().ocupados }}</p>
+              </div>
+              <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-600">Mantenimiento</p>
+                <p class="text-2xl font-semibold text-yellow-600">{{ estadisticas().mantenimiento }}</p>
+              </div>
+              <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                  <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+                </svg>
+              </div>
+            </div>
+          </div> -->
+<!-- 
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-600">Dañados</p>
+                <p class="text-2xl font-semibold text-red-600">{{ estadisticas().danados }}</p>
+              </div>
+              <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                </svg>
+              </div>
+            </div>
+          </div> -->
+        </div>
+
+        <!-- Barra de ocupación -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-medium text-gray-700">Ocupación de Puertos</h3>
+            <span class="text-2xl font-bold text-gray-900">{{ estadisticas().porcentajeOcupacion }}%</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-4">
+            <div
+              class="h-4 rounded-full transition-all"
+              [ngClass]="{
+                'bg-green-500': estadisticas().porcentajeOcupacion < 70,
+                'bg-orange-500': estadisticas().porcentajeOcupacion >= 70 && estadisticas().porcentajeOcupacion < 90,
+                'bg-red-500': estadisticas().porcentajeOcupacion >= 90
+              }"
+              [style.width.%]="estadisticas().porcentajeOcupacion"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+          <div class="flex items-center space-x-4">
+            <div class="flex-1">
+              <input
+                type="text"
+                [value]="busquedaCliente()"
+                (input)="onBusquedaClienteChange($event)"
+                placeholder="Buscar por cliente (nombre, apellido, documento)..."
+                class="w-full px-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+              />
+            </div>
+
+            <select
+              [value]="filtroEstado()"
+              (change)="onFiltroEstadoChange($event)"
+              class="px-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+            >
+              <option value="">Todos los estados</option>
+              <option value="LIBRE">Libres</option>
+              <option value="OCUPADO">Ocupados</option>
+              <option value="DAÑADO">Dañados</option>
+              <option value="RESERVADO">Reservados</option>
+            </select>
+
+            <button
+              (click)="limpiarFiltros()"
+              class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
+
+        <!-- Grid de Puertos -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Puertos del NAP</h3>
+            <div class="flex items-center space-x-3">
+              <!-- Botón de ordenamiento -->
+              <button
+                (click)="toggleOrdenamiento()"
+                class="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+                [title]="ordenAscendente() ? 'Ordenar descendente' : 'Ordenar ascendente'"
+              >
+                @if (ordenAscendente()) {
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+                  </svg>
+                  <span class="text-sm">1-{{ puertos().length }}</span>
+                } @else {
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"></path>
+                  </svg>
+                  <span class="text-sm">{{ puertos().length }}-1</span>
+                }
+              </button>
+
+              <!-- Toggle vista Grid/Tabla -->
+              <div class="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+                <button
+                  (click)="cambiarVista(true)"
+                  [ngClass]="{
+                    'bg-white shadow-sm': vistaGrid(),
+                    'text-gray-600': !vistaGrid()
+                  }"
+                  class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+                >
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                  </svg>
+                </button>
+                <button
+                  (click)="cambiarVista(false)"
+                  [ngClass]="{
+                    'bg-white shadow-sm': !vistaGrid(),
+                    'text-gray-600': vistaGrid()
+                  }"
+                  class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+                >
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          @if (puertosFiltrados().length === 0) {
+            <div class="text-center py-12 text-gray-500">
+              <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+              </svg>
+              <p>No hay puertos registrados para este NAP</p>
+              <p class="text-sm mt-2">Los puertos aparecerán aquí cuando se creen conexiones</p>
+            </div>
+          } @else {
+            <!-- Vista Grid -->
+            @if (vistaGrid()) {
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+                @for (puerto of puertosFiltrados(); track puerto.id) {
+                  <div
+                    class="border-[1.5px] rounded-lg p-3 text-center transition-all hover:shadow-md relative group"
+                    [ngClass]="{
+                      'border-green-300 bg-green-50': puerto.estado === 'LIBRE',
+                      'border-blue-300 bg-blue-50': puerto.estado === 'OCUPADO',
+                      'border-red-300 bg-red-50': puerto.estado === 'MANTENIMIENTO',
+                    }"
+                    [title]="puerto.conexion?.cliente ? (puerto.conexion?.cliente?.nombre || '') + ' ' + (puerto.conexion?.cliente?.apellido || '') : 'Puerto ' + puerto.numero"
+                  >
+                    <div class="font-bold text-lg text-gray-900 mb-1">{{ puerto.numero }}</div>
+                    <div
+                      class="text-xs px-2 py-1 rounded-full"
+                      [ngClass]="getEstadoPuertoBadgeClass(puerto.estado)"
+                    >
+                      {{ puerto.estado }}
+                    </div>
+                    @if (puerto.conexion?.cliente) {
+                      <div class="mt-2 text-xs text-gray-600 truncate">
+                        {{ puerto.conexion?.cliente?.nombre }} {{ puerto.conexion?.cliente?.apellido }}
+                      </div>
+                    }
+                    <!-- Botón para asignar cliente (solo en puertos sin conexión activa) -->
+                    @if (!puerto.conexion || puerto.conexion.estado === 'FINALIZADA') {
+                      <button
+                        (click)="abrirModalAsignar(puerto)"
+                        class="absolute inset-0 w-full h-full bg-black bg-opacity-0 hover:bg-opacity-10 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center"
+                      >
+                        <span class="bg-black text-white text-xs px-3 py-1.5 rounded-full flex items-center space-x-1">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                          </svg>
+                          <span>Asignar</span>
+                        </span>
+                      </button>
+                    } @else {
+                      <button
+                        (click)="abrirModalDetalles(puerto)"
+                        class="absolute inset-0 w-full h-full bg-black bg-opacity-0 hover:bg-opacity-10 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center"
+                      >
+                        <span class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-full flex items-center space-x-1">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                          </svg>
+                          <span>Ver</span>
+                        </span>
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            } @else {
+              <!-- Vista Tabla -->
+              <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Puerto</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                      <!-- <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ci</th> -->
+                      <!-- <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th> -->
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Inicio</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
+                      <!-- <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vel. Plan</th> -->
+
+
+                      <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    @for (puerto of puertosFiltrados(); track puerto.id) {
+                      <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <div class="text-sm font-medium text-gray-900">Puerto {{ puerto.numero }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <span class="px-2 py-1 text-xs rounded-full {{ getEstadoPuertoBadgeClass(puerto.estado) }}">
+                            {{ puerto.estado }}
+                          </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          @if (puerto.conexion?.cliente) {
+                            <div class="text-sm text-gray-900">
+                              {{ puerto.conexion?.cliente?.nombre }} {{ puerto.conexion?.cliente?.apellido }}
+                            </div>
+                          } @else {
+                            <span class="text-sm text-gray-400">-</span>
+                          }
+                        </td>
+                        <!-- <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {{ puerto.conexion?.cliente?.ci || '-' }}
+                        </td> -->
+                        <!-- <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {{ puerto.conexion?.cliente?.telefono || '-' }}
+                        </td> -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          @if (puerto.conexion?.fecha_inicio) {
+                            {{ puerto.conexion?.fecha_inicio | date:'dd/MM/yyyy' }}
+                          } @else {
+                            <span class="text-gray-400">-</span>
+                          }
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          @if (puerto.conexion?.plan) {
+                            {{ puerto.conexion?.plan?.nombre }}
+                          } @else {
+                            <span class="text-gray-400">-</span>
+                          }
+                        </td>
+                        <!-- <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          @if (puerto.conexion?.plan?.velocidad_mbps) {
+                            {{ puerto.conexion?.plan?.velocidad_mbps+' Mbps' }}
+                          } @else {
+                            <span class="text-gray-400">-</span>  
+                          }
+                        </td> -->
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          @if (!puerto.conexion || puerto.conexion.estado === 'FINALIZADA') {
+                            <button
+                              (click)="abrirModalAsignar(puerto)"
+                              class="px-3 py-1.5 bg-black text-white text-xs rounded-lg hover:bg-gray-800 transition-colors flex items-center space-x-1 ml-auto"
+                            >
+                              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                              </svg>
+                              <span>Asignar Cliente</span>
+                            </button>
+                          } @else {
+                            <button
+                              (click)="abrirModalDetalles(puerto)"
+                              class="text-blue-600 hover:text-blue-900 transition-colors"
+                              title="Ver detalles"
+                            >
+                              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                              </svg>
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+        </div>
+      </main>
+    }
+  </div>
+
+  <!-- Modal para asignar cliente y plan -->
+  @if (mostrarModalAsignar() && puertoSeleccionado()) {
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h2 class="text-xl font-semibold text-gray-900">Asignar Cliente al Puerto</h2>
+              <p class="text-sm text-gray-600 mt-1">Puerto {{ puertoSeleccionado()!.numero }} - NAP {{ nap()!.codigo }}</p>
+            </div>
+            <button
+              (click)="cerrarModalAsignar()"
+              class="text-gray-400 hover:text-gray-600"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <form (ngSubmit)="asignarCliente($event)" class="space-y-6">
+            <!-- Sección Cliente -->
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h3 class="text-sm font-semibold text-gray-900 mb-3">Información del Cliente</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Nombre*</label>
+                  <input
+                    type="text"
+                    [value]="formAsignacion().nombre"
+                    (input)="updateFormField('nombre', $event)"
+                    placeholder="Juan"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
+                  <input
+                    type="text"
+                    [value]="formAsignacion().apellido"
+                    (input)="updateFormField('apellido', $event)"
+                    placeholder="Pérez"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Documento (CI)*</label>
+                  <input
+                    type="text"
+                    [value]="formAsignacion().ci"
+                    (input)="updateFormField('ci', $event)"
+                    placeholder="12345678"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                  <input
+                    type="tel"
+                    [value]="formAsignacion().telefono"
+                    (input)="updateFormField('telefono', $event)"
+                    placeholder="+591 12345678"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    [value]="formAsignacion().correo"
+                    (input)="updateFormField('correo', $event)"
+                    placeholder="cliente@ejemplo.com"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  />
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+                  <input
+                    type="text"
+                    [value]="formAsignacion().direccion"
+                    (input)="updateFormField('direccion', $event)"
+                    placeholder="Calle Falsa 123"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Sección Plan -->
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h3 class="text-sm font-semibold text-gray-900 mb-3">Plan de Servicio</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Plan*</label>
+                  <select
+                    [value]="formAsignacion().plan_id"
+                    (change)="updateFormField('plan_id', $event)"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    required
+                  >
+                    <option value="">Seleccionar plan...</option>
+                    @for (plan of planes(); track plan.id) {
+                      <option [value]="plan.id">{{ plan.nombre }} - {{ plan.velocidad_mbps }} Mbps</option>
+                    }
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Inicio*</label>
+                  <input
+                    type="date"
+                    [value]="formAsignacion().fecha_inicio"
+                    (input)="updateFormField('fecha_inicio', $event)"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Estado del Servicio*</label>
+                  <select
+                    [value]="formAsignacion().estado_conexion"
+                    (change)="updateFormField('estado_conexion', $event)"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    required
+                  >
+                    <option value="ACTIVA">Activa</option>
+                    <option value="SUSPENDIDA">Suspendida</option>
+                    <option value="FINALIZADA">Finalizada</option>
+                  </select>
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                  <textarea
+                    rows="3"
+                    [value]="formAsignacion().nota"
+                    (input)="updateFormField('nota', $event)"
+                    placeholder="Información adicional sobre la instalación o el servicio..."
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mensaje de error -->
+            @if (error()) {
+              <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p class="text-sm text-red-600">{{ error() }}</p>
+              </div>
+            }
+
+            <!-- Botones -->
+            <div class="flex space-x-3 pt-4">
+              <button
+                type="button"
+                (click)="cerrarModalAsignar()"
+                [disabled]="isLoading()"
+                class="flex-1 bg-gray-100 text-gray-700 py-2.5 px-4 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                [disabled]="isLoading()"
+                class="flex-1 bg-black text-white py-2.5 px-4 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {{ isLoading() ? 'Asignando...' : 'Asignar Cliente y Plan' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal de Detalles del Puerto -->
+  @if (mostrarModalDetalles() && puertoSeleccionado()) {
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h2 class="text-xl font-semibold text-gray-900">Detalles del Puerto {{ puertoSeleccionado()!.numero }}</h2>
+              <p class="text-sm text-gray-600 mt-1">NAP {{ nap()!.codigo }}</p>
+            </div>
+            <button
+              (click)="cerrarModalDetalles()"
+              class="text-gray-400 hover:text-gray-600"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Información del Puerto -->
+          <div class="bg-gray-50 rounded-lg p-4 mb-4">
+            <h3 class="text-sm font-semibold text-gray-900 mb-3">Información del Puerto</h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <p class="text-xs text-gray-500">Número de Puerto</p>
+                <p class="text-sm font-medium text-gray-900">Puerto {{ puertoSeleccionado()!.numero }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500">Estado</p>
+                <span class="px-2 py-1 text-xs rounded-full {{ getEstadoPuertoBadgeClass(puertoSeleccionado()!.estado) }}">
+                  {{ puertoSeleccionado()!.estado }}
+                </span>
+              </div>
+              @if (puertoSeleccionado()!.nota) {
+                <div class="col-span-2">
+                  <p class="text-xs text-gray-500">Notas del Puerto</p>
+                  <p class="text-sm text-gray-900 mt-1">{{ puertoSeleccionado()!.nota }}</p>
+                </div>
+              }
+            </div>
+          </div>
+
+          @if (puertoSeleccionado()!.conexion) {
+            <!-- Información del Cliente -->
+            <div class="bg-blue-50 rounded-lg p-4 mb-4">
+              <h3 class="text-sm font-semibold text-gray-900 mb-3">Información del Cliente</h3>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <p class="text-xs text-gray-500">Nombre Completo</p>
+                  <p class="text-sm font-medium text-gray-900">
+                    {{ puertoSeleccionado()!.conexion!.cliente?.nombre }} {{ puertoSeleccionado()!.conexion!.cliente?.apellido }}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-500">Documento (CI)</p>
+                  <p class="text-sm text-gray-900">{{ puertoSeleccionado()!.conexion!.cliente?.ci || '-' }}</p>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-500">Teléfono</p>
+                  <p class="text-sm text-gray-900">{{ puertoSeleccionado()!.conexion!.cliente?.telefono || '-' }}</p>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-500">Email</p>
+                  <p class="text-sm text-gray-900 truncate">{{ puertoSeleccionado()!.conexion!.cliente?.correo || '-' }}</p>
+                </div>
+                @if (puertoSeleccionado()!.conexion!.cliente?.direccion) {
+                  <div class="col-span-2">
+                    <p class="text-xs text-gray-500">Dirección</p>
+                    <p class="text-sm text-gray-900">{{ puertoSeleccionado()!.conexion!.cliente!.direccion }}</p>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Información del Plan y Conexión -->
+            <div class="bg-green-50 rounded-lg p-4 mb-4">
+              <h3 class="text-sm font-semibold text-gray-900 mb-3">Plan y Conexión</h3>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2">
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Plan Contratado</label>
+                  <select
+                    [value]="planSeleccionado()"
+                    (change)="onPlanChange($event)"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
+                  >
+                    @for (plan of planes(); track plan.id) {
+                      <option [value]="plan.id">{{ plan.nombre }} - {{ plan.velocidad_mbps }} Mbps</option>
+                    }
+                  </select>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-500">Fecha de Inicio</p>
+                  <p class="text-sm text-gray-900">
+                    {{ puertoSeleccionado()!.conexion!.fecha_inicio | date:'dd/MM/yyyy' }}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-500">Estado de Conexión</p>
+                  <span class="px-2 py-1 text-xs rounded-full {{ getEstadoConexionBadgeClass(puertoSeleccionado()!.conexion!.estado) }}">
+                    {{ puertoSeleccionado()!.conexion!.estado }}
+                  </span>
+                </div>
+                @if (puertoSeleccionado()!.conexion!.fecha_fin) {
+                  <div>
+                    <p class="text-xs text-gray-500">Fecha de Fin</p>
+                    <p class="text-sm text-gray-900">
+                      {{ puertoSeleccionado()!.conexion!.fecha_fin | date:'dd/MM/yyyy' }}
+                    </p>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Control de Estado de Conexión -->
+            <div class="bg-yellow-50 rounded-lg p-4 mb-4 border border-yellow-200">
+              <h3 class="text-sm font-semibold text-gray-900 mb-3">Estado de la Conexión</h3>
+              <div class="grid grid-cols-1 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Estado Actual</label>
+                  <select
+                    [value]="estadoConexionSeleccionado()"
+                    (change)="onEstadoConexionChange($event)"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white"
+                  >
+                    <option value="ACTIVA">Activa</option>
+                    <option value="SUSPENDIDA">Suspendida</option>
+                    <!-- <option value="FINALIZADA">Finalizada</option> -->
+                  </select>
+                </div>
+                <div class="flex items-center space-x-2 pt-2">
+                  <button
+                    type="button"
+                    (click)="confirmarLiberarPuerto()"
+                    [disabled]="isLoading()"
+                    class="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                    <span>Liberar Puerto</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mensaje de error -->
+            @if (error()) {
+              <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <p class="text-sm text-red-600">{{ error() }}</p>
+              </div>
+            }
+
+            <!-- Acciones -->
+            <div class="flex space-x-3">
+              <button
+                type="button"
+                (click)="cerrarModalDetalles()"
+                [disabled]="isLoading()"
+                class="flex-1 bg-gray-100 text-gray-700 py-2.5 px-4 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                (click)="guardarCambios()"
+                [disabled]="isLoading() || !hayCambios()"
+                class="flex-1 bg-green-600 text-white py-2.5 px-4 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <span>{{ isLoading() ? 'Guardando...' : 'Guardar Cambios' }}</span>
+              </button>
+            </div>
+          } @else {
+            <div class="text-center py-8 text-gray-500">
+              <p>No hay cliente asignado a este puerto</p>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</app-layout>
