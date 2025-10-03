@@ -3,6 +3,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { AuthStore, User } from '../stores/auth.store';
+import { environment } from '../../environments/environment';
 
 export interface LoginRequest {
   correo: string;
@@ -24,7 +25,7 @@ export interface LoginResponse {
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly authStore = inject(AuthStore);
-  private readonly apiUrl = 'http://localhost:3000/api/v1'; // Ajusta según tu endpoint
+  private readonly apiUrl = environment.apiUrl;
 
   login(credentials: LoginRequest): Observable<void> {
     this.authStore.setLoading(true);

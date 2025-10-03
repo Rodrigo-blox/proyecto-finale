@@ -2,6 +2,47 @@ const { Puerto, NAP, Conexion, Cliente, Plan, sequelize } = require('../models')
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 
+/**
+ * Obtiene todos los puertos de un NAP específico con sus conexiones y estadísticas
+ * 
+ * @async
+ * @function obtenerPuertosPorNAP
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} req.params - Parámetros de ruta
+ * @param {string} req.params.nap_id - ID del NAP del cual obtener puertos
+ * @param {Object} req.query - Parámetros de consulta
+ * @param {string} [req.query.estado] - Filtro por estado del puerto (LIBRE, OCUPADO, MANTENIMIENTO)
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con puertos del NAP y estadísticas
+ * 
+ * @example
+ * // GET /api/puertos/nap/123?estado=LIBRE
+ * // Respuesta:
+ * // {
+ * //   success: true,
+ * //   data: {
+ * //     nap: { id: 123, codigo: "NAP001", ... },
+ * //     puertos: [...], // Array de puertos con conexiones
+ * //     estadisticas: {
+ * //       total: 16,
+ * //       libres: 4,
+ * //       ocupados: 12,
+ * //       mantenimiento: 0
+ * //     }
+ * //   }
+ * // }
+ * 
+ * @throws {404} NAP no encontrado
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Obtiene todos los puertos de un NAP con sus conexiones activas
+ * - Incluye datos de clientes y planes asociados
+ * - Calcula estadísticas de ocupación automáticamente
+ * - Ordena puertos por número ascendente
+ * - Filtro opcional por estado de puerto
+ */
 const obtenerPuertosPorNAP = async (req, res) => {
   try {
     const { nap_id } = req.params;
@@ -63,6 +104,43 @@ const obtenerPuertosPorNAP = async (req, res) => {
   }
 };
 
+/**
+ * Obtiene todos los puertos disponibles (libres) del sistema
+ * 
+ * @async
+ * @function obtenerPuertosLibres
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} req.query - Parámetros de consulta
+ * @param {string} [req.query.nap_id] - Filtro opcional por ID de NAP específico
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con lista de puertos libres
+ * 
+ * @example
+ * // GET /api/puertos/libres?nap_id=123
+ * // Respuesta:
+ * // {
+ * //   success: true,
+ * //   data: [
+ * //     {
+ * //       id: 45,
+ * //       numero: 3,
+ * //       estado: "LIBRE",
+ * //       nap: { codigo: "NAP001", ubicacion: "..." }
+ * //     }
+ * //   ],
+ * //   total: 25
+ * // }
+ * 
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Lista todos los puertos con estado 'LIBRE'
+ * - Filtro opcional por NAP específico
+ * - Incluye información del NAP asociado
+ * - Ordena por código de NAP y número de puerto
+ * - Útil para asignación de nuevas conexiones
+ */
 const obtenerPuertosLibres = async (req, res) => {
   try {
     const { nap_id } = req.query;
@@ -92,6 +170,44 @@ const obtenerPuertosLibres = async (req, res) => {
   }
 };
 
+/**
+ * Obtiene un puerto específico por su ID con toda la información relacionada
+ * 
+ * @async
+ * @function obtenerPuertoPorId
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} req.params - Parámetros de ruta
+ * @param {string} req.params.id - ID único del puerto
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con datos completos del puerto
+ * 
+ * @example
+ * // GET /api/puertos/45
+ * // Respuesta:
+ * // {
+ * //   success: true,
+ * //   data: {
+ * //     id: 45,
+ * //     numero: 8,
+ * //     estado: "OCUPADO",
+ * //     nap: { codigo: "NAP001", ... },
+ * //     conexion: {
+ * //       cliente: { nombre: "Juan Pérez", ... },
+ * //       plan: { nombre: "Fibra 100MB", ... }
+ * //     }
+ * //   }
+ * // }
+ * 
+ * @throws {404} Puerto no encontrado
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Obtiene puerto con NAP, conexión, cliente y plan asociados
+ * - Vista completa para detalles y gestión
+ * - Incluye solo conexiones activas o suspendidas
+ * - Útil para edición y diagnóstico
+ */
 const obtenerPuertoPorId = async (req, res) => {
   try {
     const { id } = req.params;
@@ -179,6 +295,27 @@ const actualizarPuerto = async (req, res) => {
       estado: estado || puerto.estado,
       nota: nota !== undefined ? nota : puerto.nota
     });
+
+    // Si se liberó un puerto, verificar si el NAP estaba saturado
+    if (estado === 'LIBRE') {
+      const nap = await NAP.findByPk(puerto.nap_id, {
+        include: [{
+          model: Puerto,
+          as: 'puertos',
+          attributes: ['estado']
+        }]
+      });
+
+      if (nap && nap.estado === 'SATURADO') {
+        const puertosOcupados = nap.puertos.filter(p => p.estado === 'OCUPADO').length;
+        const porcentajeOcupacion = (puertosOcupados / nap.total_puertos) * 100;
+
+        // Si ya no está al 100%, cambiar el estado a ACTIVO
+        if (porcentajeOcupacion < 100) {
+          await nap.update({ estado: 'ACTIVO' });
+        }
+      }
+    }
 
     const puertoActualizado = await Puerto.findByPk(id, {
       include: [
@@ -432,6 +569,26 @@ const asignarClienteAPuerto = async (req, res) => {
       nota: nota || puerto.nota
     }, { transaction });
 
+    // Verificar si el NAP alcanzó el 100% de ocupación
+    const nap = await NAP.findByPk(puerto.nap_id, {
+      include: [{
+        model: Puerto,
+        as: 'puertos',
+        attributes: ['estado']
+      }],
+      transaction
+    });
+
+    if (nap) {
+      const puertosOcupados = nap.puertos.filter(p => p.estado === 'OCUPADO').length;
+      const porcentajeOcupacion = (puertosOcupados / nap.total_puertos) * 100;
+
+      // Si llega al 100%, cambiar el estado a SATURADO
+      if (porcentajeOcupacion >= 100 && nap.estado !== 'SATURADO') {
+        await nap.update({ estado: 'SATURADO' }, { transaction });
+      }
+    }
+
     // Commit de la transacción
     await transaction.commit();
 
@@ -522,6 +679,26 @@ const liberarPuerto = async (req, res) => {
     await puerto.update({
       estado: 'LIBRE'
     }, { transaction });
+
+    // Verificar si el NAP estaba saturado y actualizar su estado
+    const nap = await NAP.findByPk(puerto.nap_id, {
+      include: [{
+        model: Puerto,
+        as: 'puertos',
+        attributes: ['estado']
+      }],
+      transaction
+    });
+
+    if (nap && nap.estado === 'SATURADO') {
+      const puertosOcupados = nap.puertos.filter(p => p.estado === 'OCUPADO').length;
+      const porcentajeOcupacion = (puertosOcupados / nap.total_puertos) * 100;
+
+      // Si ya no está al 100%, cambiar el estado a ACTIVO
+      if (porcentajeOcupacion < 100) {
+        await nap.update({ estado: 'ACTIVO' }, { transaction });
+      }
+    }
 
     await transaction.commit();
 

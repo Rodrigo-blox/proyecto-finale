@@ -23,16 +23,43 @@ const limiter = rateLimit({
   }
 });
 
-app.use(helmet());
-// app.use(limiter);
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:4200',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Content-Length', 'Content-Type'],
-  
+// Configuración de seguridad con Helmet
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false
 }));
+
+// Configuración de CORS
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Permitir requests sin origin (mobile apps, Postman, etc)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = process.env.CORS_ORIGIN === '*'
+      ? [origin]
+      : process.env.CORS_ORIGIN.split(',').map(o => o.trim());
+
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('No permitido por CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Content-Length', 'Content-Type', 'Authorization'],
+  maxAge: 86400, // 24 horas
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+
+// Manejar preflight requests explícitamente
+app.options('*', cors(corsOptions));
+
+// app.use(limiter);
 
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));

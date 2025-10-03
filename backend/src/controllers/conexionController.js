@@ -2,6 +2,46 @@ const { Conexion, Cliente, Plan, Puerto, NAP, Usuario } = require('../models');
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 
+/**
+ * Obtiene una lista paginada de conexiones con filtros opcionales
+ * 
+ * @async
+ * @function obtenerConexiones
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} req.query - Parámetros de consulta
+ * @param {number} [req.query.page=1] - Número de página
+ * @param {number} [req.query.limit=10] - Límite de registros por página
+ * @param {string} [req.query.estado] - Filtro por estado (ACTIVA, SUSPENDIDA, FINALIZADA)
+ * @param {number} [req.query.cliente_id] - Filtro por ID de cliente
+ * @param {number} [req.query.nap_id] - Filtro por ID de NAP
+ * @param {string} [req.query.buscar] - Búsqueda por nombre o CI del cliente
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con lista paginada de conexiones
+ * 
+ * @example
+ * // GET /api/conexiones?estado=ACTIVA&page=1&limit=5&buscar=Juan
+ * // Respuesta:
+ * // {
+ * //   success: true,
+ * //   data: [...], // Array de conexiones con relaciones
+ * //   pagination: {
+ * //     total: 25,
+ * //     pages: 5,
+ * //     currentPage: 1,
+ * //     limit: 5
+ * //   }
+ * // }
+ * 
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Implementa paginación completa con metadatos
+ * - Filtros combinables por estado, cliente y NAP
+ * - Búsqueda en nombre y CI del cliente
+ * - Incluye relaciones: cliente, plan, puerto, NAP y usuario creador
+ * - Ordena por fecha de creación descendente
+ */
 const obtenerConexiones = async (req, res) => {
   try {
     const { page = 1, limit = 10, estado, cliente_id, nap_id, buscar } = req.query;
@@ -87,6 +127,42 @@ const obtenerConexiones = async (req, res) => {
   }
 };
 
+/**
+ * Obtiene una conexión específica por su ID con todos los datos relacionados
+ * 
+ * @async
+ * @function obtenerConexionPorId
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} req.params - Parámetros de ruta
+ * @param {string} req.params.id - ID único de la conexión
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con datos completos de la conexión
+ * 
+ * @example
+ * // GET /api/conexiones/123
+ * // Respuesta:
+ * // {
+ * //   success: true,
+ * //   data: {
+ * //     id: 123,
+ * //     estado: "ACTIVA",
+ * //     fecha_inicio: "2024-01-15",
+ * //     cliente: {...},
+ * //     plan: {...},
+ * //     puerto: { nap: {...} },
+ * //     creador: {...}
+ * //   }
+ * // }
+ * 
+ * @throws {404} Conexión no encontrada
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Incluye todas las relaciones: cliente, plan, puerto/NAP, usuario creador
+ * - Proporciona vista completa de la conexión
+ * - Útil para detalles y edición de conexiones
+ */
 const obtenerConexionPorId = async (req, res) => {
   try {
     const { id } = req.params;
@@ -124,6 +200,46 @@ const obtenerConexionPorId = async (req, res) => {
   }
 };
 
+/**
+ * Crea una nueva conexión asignando un puerto a un cliente con un plan
+ * 
+ * @async
+ * @function crearConexion
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} req.body - Datos de la conexión
+ * @param {number} req.body.puerto_id - ID del puerto a asignar
+ * @param {number} req.body.cliente_id - ID del cliente
+ * @param {number} req.body.plan_id - ID del plan de servicio
+ * @param {string} req.body.fecha_inicio - Fecha de inicio del servicio
+ * @param {string} [req.body.fecha_fin] - Fecha de finalización programada
+ * @param {Object} req.usuario - Usuario autenticado
+ * @param {number} req.usuario.id - ID del usuario que crea la conexión
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con conexión creada
+ * 
+ * @example
+ * // POST /api/conexiones
+ * // Body: {
+ * //   puerto_id: 45,
+ * //   cliente_id: 123,
+ * //   plan_id: 7,
+ * //   fecha_inicio: "2024-01-15",
+ * //   fecha_fin: "2025-01-15"
+ * // }
+ * 
+ * @throws {400} Datos inválidos, puerto no disponible o conexión duplicada
+ * @throws {404} Puerto, cliente o plan no encontrado
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Valida disponibilidad del puerto (estado LIBRE)
+ * - Verifica existencia de cliente y plan
+ * - Previene conexiones duplicadas en el mismo puerto
+ * - Actualiza puerto a estado OCUPADO
+ * - Registra usuario creador para auditoría
+ * - Crea conexión con estado ACTIVA por defecto
+ */
 const crearConexion = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -222,6 +338,43 @@ const crearConexion = async (req, res) => {
   }
 };
 
+/**
+ * Actualiza los datos de una conexión existente
+ * 
+ * @async
+ * @function actualizarConexion
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} req.params - Parámetros de ruta
+ * @param {string} req.params.id - ID de la conexión a actualizar
+ * @param {Object} req.body - Datos de actualización
+ * @param {number} [req.body.plan_id] - Nuevo ID del plan
+ * @param {string} [req.body.fecha_fin] - Nueva fecha de finalización
+ * @param {string} [req.body.estado] - Nuevo estado (ACTIVA, SUSPENDIDA, FINALIZADA)
+ * @param {Object} [req.usuario] - Usuario autenticado (para auditoría)
+ * @param {number} [req.usuario.id] - ID del usuario que actualiza
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con conexión actualizada
+ * 
+ * @example
+ * // PUT /api/conexiones/123
+ * // Body: {
+ * //   estado: "SUSPENDIDA",
+ * //   fecha_fin: "2024-12-31"
+ * // }
+ * 
+ * @throws {400} Datos de entrada inválidos
+ * @throws {404} Conexión o plan no encontrado
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Permite actualización parcial de campos
+ * - Actualiza estado del puerto según el estado de conexión:
+ *   - FINALIZADA: libera puerto (LIBRE)
+ *   - ACTIVA/SUSPENDIDA: mantiene puerto ocupado (OCUPADO)
+ * - Valida existencia del nuevo plan si se cambia
+ * - Registra auditoría de los cambios
+ */
 const actualizarConexion = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -303,6 +456,44 @@ const actualizarConexion = async (req, res) => {
   }
 };
 
+/**
+ * Finaliza una conexión activa, liberando el puerto asociado
+ * 
+ * @async
+ * @function finalizarConexion
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} req.params - Parámetros de ruta
+ * @param {string} req.params.id - ID de la conexión a finalizar
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con conexión finalizada
+ * 
+ * @example
+ * // POST /api/conexiones/123/finalizar
+ * // Respuesta:
+ * // {
+ * //   success: true,
+ * //   message: "Conexión finalizada exitosamente",
+ * //   data: {
+ * //     id: 123,
+ * //     estado: "FINALIZADA",
+ * //     fecha_fin: "2024-03-15T10:30:00Z",
+ * //     ...
+ * //   }
+ * // }
+ * 
+ * @throws {400} La conexión ya está finalizada
+ * @throws {404} Conexión no encontrada
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Cambia estado de conexión a FINALIZADA
+ * - Establece fecha_fin automáticamente
+ * - Libera el puerto asociado (estado LIBRE)
+ * - Actualiza estado de NAP si estaba SATURADO y ya no lo está
+ * - Previene finalizar conexiones ya finalizadas
+ * - Optimiza disponibilidad de recursos automáticamente
+ */
 const finalizarConexion = async (req, res) => {
   try {
     const { id } = req.params;
@@ -332,6 +523,25 @@ const finalizarConexion = async (req, res) => {
 
     await conexion.puerto.update({ estado: 'LIBRE' });
 
+    // Verificar si el NAP estaba saturado y actualizar su estado
+    const nap = await NAP.findByPk(conexion.puerto.nap_id, {
+      include: [{
+        model: Puerto,
+        as: 'puertos',
+        attributes: ['estado']
+      }]
+    });
+
+    if (nap && nap.estado === 'SATURADO') {
+      const puertosOcupados = nap.puertos.filter(p => p.estado === 'OCUPADO').length;
+      const porcentajeOcupacion = (puertosOcupados / nap.total_puertos) * 100;
+
+      // Si ya no está al 100%, cambiar el estado a ACTIVO
+      if (porcentajeOcupacion < 100) {
+        await nap.update({ estado: 'ACTIVO' });
+      }
+    }
+
     const conexionFinalizada = await Conexion.findByPk(id, {
       include: [
         { model: Cliente, as: 'cliente' },
@@ -359,6 +569,44 @@ const finalizarConexion = async (req, res) => {
   }
 };
 
+/**
+ * Obtiene todas las conexiones de un cliente específico
+ * 
+ * @async
+ * @function obtenerConexionesPorCliente
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} req.params - Parámetros de ruta
+ * @param {string} req.params.cliente_id - ID del cliente
+ * @param {Object} req.query - Parámetros de consulta
+ * @param {string} [req.query.estado] - Filtro por estado de conexión
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con conexiones del cliente
+ * 
+ * @example
+ * // GET /api/conexiones/cliente/123?estado=ACTIVA
+ * // Respuesta:
+ * // {
+ * //   success: true,
+ * //   data: [
+ * //     {
+ * //       id: 456,
+ * //       estado: "ACTIVA",
+ * //       plan: {...},
+ * //       puerto: { nap: {...} }
+ * //     }
+ * //   ]
+ * // }
+ * 
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Obtiene historial completo de conexiones del cliente
+ * - Filtro opcional por estado de conexión
+ * - Incluye plan y ubicación (puerto/NAP) de cada conexión
+ * - Ordena por fecha de creación descendente
+ * - Útil para vista de historial del cliente
+ */
 const obtenerConexionesPorCliente = async (req, res) => {
   try {
     const { cliente_id } = req.params;

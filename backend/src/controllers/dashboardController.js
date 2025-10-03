@@ -1,6 +1,46 @@
 const { NAP, Puerto, Cliente, Conexion, Plan, Mantenimiento, Usuario } = require('../models');
 const { Op } = require('sequelize');
 
+/**
+ * Obtiene las estadísticas generales del sistema para el dashboard principal
+ * 
+ * @async
+ * @function obtenerEstadisticasGenerales
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con estadísticas completas del sistema
+ * 
+ * @example
+ * // GET /api/dashboard/estadisticas
+ * // Respuesta:
+ * // {
+ * //   success: true,
+ * //   data: {
+ * //     resumen: {
+ * //       total_naps: 50,
+ * //       total_clientes: 120,
+ * //       total_planes: 8,
+ * //       total_conexiones: 95,
+ * //       conexiones_activas: 85,
+ * //       porcentaje_ocupacion: 75
+ * //     },
+ * //     naps: { total: 50, activos: 45, mantenimiento: 3, saturados: 2 },
+ * //     puertos: { total: 800, libres: 200, ocupados: 600, mantenimiento: 0 },
+ * //     conexiones: { total: 95, activas: 85, suspendidas: 5, finalizadas: 5 }
+ * //   }
+ * // }
+ * 
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Proporciona métricas completas del sistema
+ * - Calcula estadísticas de NAPs por estado
+ * - Analiza ocupación de puertos y porcentajes
+ * - Resumen de conexiones por estado
+ * - Datos optimizados para widgets de dashboard
+ * - Incluye KPIs principales del negocio
+ */
 const obtenerEstadisticasGenerales = async (req, res) => {
   try {
     const totalNAPs = await NAP.count();
@@ -86,6 +126,45 @@ const obtenerEstadisticasGenerales = async (req, res) => {
   }
 };
 
+/**
+ * Obtiene y genera alertas del sistema basadas en el estado de NAPs y mantenimientos
+ * 
+ * @async
+ * @function obtenerAlertas
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con lista de alertas ordenadas por prioridad
+ * 
+ * @example
+ * // GET /api/dashboard/alertas
+ * // Respuesta:
+ * // {
+ * //   success: true,
+ * //   data: [
+ * //     {
+ * //       tipo: "NAP_SATURADO",
+ * //       nivel: "CRITICO",
+ * //       mensaje: "NAP NAP001 está saturado",
+ * //       detalle: "Ubicación: Av. Principal 123",
+ * //       nap_id: 1,
+ * //       fecha: "2024-03-15T10:30:00Z"
+ * //     }
+ * //   ],
+ * //   total: 5
+ * // }
+ * 
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Detecta NAPs saturados (100% ocupación) - CRÍTICO
+ * - Identifica NAPs en mantenimiento - ADVERTENCIA
+ * - Alerta NAPs próximos a saturación (80-99%) - ADVERTENCIA
+ * - Reporta mantenimientos correctivos recientes - INFO
+ * - Actualiza automáticamente estado de NAPs a SATURADO
+ * - Ordena alertas por nivel de prioridad (CRÍTICO > ADVERTENCIA > INFO)
+ * - Sistema de monitoreo proactivo
+ */
 const obtenerAlertas = async (req, res) => {
   try {
     const alertas = [];
@@ -122,7 +201,11 @@ const obtenerAlertas = async (req, res) => {
       });
     }
 
+    // Buscar NAPs activos para verificar ocupación (excluir los que ya están en mantenimiento o saturados)
     const napsProximosSaturacion = await NAP.findAll({
+      where: {
+        estado: 'ACTIVO'
+      },
       attributes: ['id', 'codigo', 'ubicacion', 'total_puertos'],
       include: [{
         model: Puerto,
@@ -135,6 +218,7 @@ const obtenerAlertas = async (req, res) => {
       const puertosOcupados = nap.puertos.filter(p => p.estado === 'OCUPADO').length;
       const porcentajeOcupacion = (puertosOcupados / nap.total_puertos) * 100;
 
+      // Alerta cuando está entre 80% y 99%
       if (porcentajeOcupacion >= 80 && porcentajeOcupacion < 100) {
         alertas.push({
           tipo: 'NAP_PROXIMO_SATURACION',
@@ -144,6 +228,11 @@ const obtenerAlertas = async (req, res) => {
           nap_id: nap.id,
           fecha: new Date()
         });
+      }
+
+      // Actualizar estado del NAP a SATURADO si llega al 100%
+      if (porcentajeOcupacion >= 100) {
+        await nap.update({ estado: 'SATURADO' });
       }
     }
 
@@ -187,6 +276,49 @@ const obtenerAlertas = async (req, res) => {
   }
 };
 
+/**
+ * Obtiene el estado de ocupación detallado de todos los NAPs
+ * 
+ * @async
+ * @function obtenerOcupacionNAPs
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con ocupación detallada de cada NAP
+ * 
+ * @example
+ * // GET /api/dashboard/ocupacion-naps
+ * // Respuesta:
+ * // {
+ * //   success: true,
+ * //   data: [
+ * //     {
+ * //       id: 1,
+ * //       codigo: "NAP001",
+ * //       ubicacion: "Av. Principal 123",
+ * //       estado: "ACTIVO",
+ * //       coordenadas: { latitud: -12.0464, longitud: -77.0428 },
+ * //       puertos: {
+ * //         total: 16,
+ * //         libres: 4,
+ * //         ocupados: 12,
+ * //         mantenimiento: 0,
+ * //         porcentaje_ocupacion: 75
+ * //       }
+ * //     }
+ * //   ]
+ * // }
+ * 
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Proporciona vista detallada de ocupación de cada NAP
+ * - Incluye coordenadas geográficas para mapas
+ * - Calcula estadísticas de puertos por estado
+ * - Porcentaje de ocupación redondeado
+ * - Datos optimizados para visualizaciones de mapa
+ * - Útil para análisis de capacidad y planificación
+ */
 const obtenerOcupacionNAPs = async (req, res) => {
   try {
     const naps = await NAP.findAll({
@@ -237,6 +369,47 @@ const obtenerOcupacionNAPs = async (req, res) => {
   }
 };
 
+/**
+ * Obtiene estadísticas de actividad del sistema en un período específico
+ * 
+ * @async
+ * @function obtenerEstadisticasPorPeriodo
+ * @param {Object} req - Objeto de solicitud Express
+ * @param {Object} req.query - Parámetros de consulta
+ * @param {string} [req.query.periodo=30] - Número de días hacia atrás para el análisis
+ * @param {Object} res - Objeto de respuesta Express
+ * 
+ * @returns {Promise<void>} Respuesta JSON con estadísticas del período especificado
+ * 
+ * @example
+ * // GET /api/dashboard/estadisticas-periodo?periodo=7
+ * // Respuesta:
+ * // {
+ * //   success: true,
+ * //   data: {
+ * //     periodo_dias: 7,
+ * //     nuevas_conexiones: 15,
+ * //     conexiones_finalizadas: 3,
+ * //     nuevos_clientes: 8,
+ * //     mantenimientos: {
+ * //       total: 5,
+ * //       correctivos: 2,
+ * //       preventivos: 3
+ * //     }
+ * //   }
+ * // }
+ * 
+ * @throws {500} Error interno del servidor
+ * 
+ * @description
+ * - Analiza actividad en período configurable (días)
+ * - Cuenta nuevas conexiones creadas
+ * - Registra conexiones finalizadas
+ * - Trackea crecimiento de clientes
+ * - Desglose de mantenimientos por tipo
+ * - Útil para reportes de actividad y tendencias
+ * - Permite análisis de rendimiento temporal
+ */
 const obtenerEstadisticasPorPeriodo = async (req, res) => {
   try {
     const { periodo = '30' } = req.query; // días
