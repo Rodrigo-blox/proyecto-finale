@@ -69,7 +69,7 @@ const obtenerUsuarios = async (req, res) => {
       attributes: { exclude: ['clave'] },
       limit: parseInt(limite),
       offset: parseInt(offset),
-      order: [['created_at', 'DESC']]
+      order: [['createdAt', 'DESC']]
     });
 
     res.json({
