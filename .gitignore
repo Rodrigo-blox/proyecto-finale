@@ -1,3 +1,5 @@
 rodrigo.pub
 docker-compose.yml
 init-db.sql
+.claude/
+backend/test-db.js

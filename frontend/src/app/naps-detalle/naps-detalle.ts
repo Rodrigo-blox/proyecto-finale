@@ -6,6 +6,7 @@ import { Layout } from '../components/layout/layout';
 import { AuthService } from '../services/auth.service';
 import { NAPService } from '../services/nap.service';
 import { Plan, PuertoService } from '../services/puerto.service';
+import { MantenimientoService, Mantenimiento } from '../services/mantenimiento.service';
 import { AuthStore } from '../stores/auth.store';
 
 interface Puerto {
@@ -59,6 +60,7 @@ export class NapsDetalle implements OnInit {
   private readonly authStore = inject(AuthStore);
   private readonly napService = inject(NAPService);
   private readonly puertoService = inject(PuertoService);
+  private readonly mantenimientoService = inject(MantenimientoService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -104,6 +106,16 @@ export class NapsDetalle implements OnInit {
   // Ordenamiento de puertos
   ordenAscendente = signal(true);
 
+  // Mantenimientos
+  mantenimientos = signal<Mantenimiento[]>([]);
+  mostrarModalMantenimiento = signal(false);
+  guardandoMantenimiento = signal(false);
+  formMantenimiento = signal<{ tipo: 'PREVENTIVO' | 'CORRECTIVO'; descripcion: string; fecha: string }>({
+    tipo: 'CORRECTIVO',
+    descripcion: '',
+    fecha: new Date().toISOString().split('T')[0]
+  });
+
   napId: string | null = null;
 
   ngOnInit() {
@@ -113,6 +125,14 @@ export class NapsDetalle implements OnInit {
     } else {
       this.router.navigate(['/naps']);
     }
+  }
+
+  private cargarMantenimientos() {
+    if (!this.napId) return;
+    this.mantenimientoService.obtenerPorNAP(this.napId).subscribe({
+      next: (r) => { if (r.success) this.mantenimientos.set(r.data); },
+      error: () => {}
+    });
   }
 
   private cargarDetallesNAP() {
@@ -141,6 +161,7 @@ export class NapsDetalle implements OnInit {
           this.puertos.set(puertos);
 
           this.isLoading.set(false);
+          this.cargarMantenimientos();
         }
       },
       error: (error) => {
@@ -455,6 +476,52 @@ export class NapsDetalle implements OnInit {
       case 'FINALIZADA': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  }
+
+  // ─── Mantenimientos ─────────────────────────────────────────────────────────
+  abrirModalMantenimiento() {
+    this.formMantenimiento.set({
+      tipo: 'CORRECTIVO',
+      descripcion: '',
+      fecha: new Date().toISOString().split('T')[0]
+    });
+    this.mostrarModalMantenimiento.set(true);
+  }
+
+  cerrarModalMantenimiento() {
+    this.mostrarModalMantenimiento.set(false);
+  }
+
+  setTipoMantenimiento(tipo: 'PREVENTIVO' | 'CORRECTIVO') {
+    this.formMantenimiento.update(f => ({ ...f, tipo }));
+  }
+
+  updateFormMantenimiento(campo: string, event: Event) {
+    const valor = (event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
+    this.formMantenimiento.update(f => ({ ...f, [campo]: valor }));
+  }
+
+  registrarMantenimiento() {
+    if (!this.napId) return;
+    const form = this.formMantenimiento();
+    if (!form.descripcion.trim()) return;
+
+    this.guardandoMantenimiento.set(true);
+    this.mantenimientoService.crear({ nap_id: this.napId, ...form }).subscribe({
+      next: (r) => {
+        if (r.success) {
+          this.cerrarModalMantenimiento();
+          this.cargarMantenimientos();
+          this.cargarDetallesNAP();
+        }
+        this.guardandoMantenimiento.set(false);
+      },
+      error: () => { this.guardandoMantenimiento.set(false); }
+    });
+  }
+
+  getTipoMantenimientoBadge(tipo: string): string {
+    return tipo === 'CORRECTIVO' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
   }
 
   logout() {

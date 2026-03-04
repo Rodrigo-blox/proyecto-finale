@@ -3,9 +3,13 @@ const { Op } = require('sequelize');
 const PDFGenerator = require('../utils/pdfGenerator');
 const ExcelGenerator = require('../utils/excelGenerator');
 
-/**
- * Helper para enviar reporte en el formato solicitado
- */
+// fecha_hasta como string YYYY-MM-DD llega como medianoche UTC → ajustar al final del día
+const finDelDia = (fechaStr) => {
+  const d = new Date(fechaStr);
+  d.setHours(23, 59, 59, 999);
+  return d;
+};
+
 const enviarReporteEnFormato = async (res, datos, tipo, formato = 'json') => {
   try {
     switch (formato.toLowerCase()) {
@@ -16,7 +20,6 @@ const enviarReporteEnFormato = async (res, datos, tipo, formato = 'json') => {
         res.setHeader('Content-Disposition', `attachment; filename=reporte_${tipo}_${Date.now()}.pdf`);
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         return res.end(pdfBuffer, 'binary');
-
       case 'excel':
       case 'xlsx':
         const excelBuffer = await ExcelGenerator.generarExcel(datos, tipo);
@@ -25,37 +28,22 @@ const enviarReporteEnFormato = async (res, datos, tipo, formato = 'json') => {
         res.setHeader('Content-Disposition', `attachment; filename=reporte_${tipo}_${Date.now()}.xlsx`);
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         return res.end(excelBuffer, 'binary');
-
       case 'json':
       default:
         return res.json(datos);
     }
   } catch (error) {
     console.error(`Error al generar reporte en formato ${formato}:`, error);
-    return res.status(500).json({
-      success: false,
-      message: `Error al generar el reporte en formato ${formato}`
-    });
+    return res.status(500).json({ success: false, message: `Error al generar el reporte en formato ${formato}` });
   }
 };
 
+// ─── Reporte 1: Ocupación por NAP ────────────────────────────────────────────
 const reporteOcupacionNAPs = async (req, res) => {
   try {
-    const { fecha_desde, fecha_hasta, formato = 'json' } = req.query;
-
-    let whereCondition = {};
-    if (fecha_desde || fecha_hasta) {
-      whereCondition.createdAt = {};
-      if (fecha_desde) {
-        whereCondition.createdAt[Op.gte] = new Date(fecha_desde);
-      }
-      if (fecha_hasta) {
-        whereCondition.createdAt[Op.lte] = new Date(fecha_hasta);
-      }
-    }
+    const { formato = 'json' } = req.query;
 
     const naps = await NAP.findAll({
-      where: whereCondition,
       attributes: ['id', 'codigo', 'modelo', 'ubicacion', 'estado', 'total_puertos', 'createdAt'],
       include: [{
         model: Puerto,
@@ -79,123 +67,76 @@ const reporteOcupacionNAPs = async (req, res) => {
       const puertosLibres = nap.puertos.filter(p => p.estado === 'LIBRE').length;
       const puertosOcupados = nap.puertos.filter(p => p.estado === 'OCUPADO').length;
       const puertosMantenimiento = nap.puertos.filter(p => p.estado === 'MANTENIMIENTO').length;
-      const porcentajeOcupacion = Math.round((puertosOcupados / nap.total_puertos) * 100);
+      const porcentajeOcupacion = nap.total_puertos > 0
+        ? Math.round((puertosOcupados / nap.total_puertos) * 100)
+        : 0;
 
       return {
-        nap: {
-          id: nap.id,
-          codigo: nap.codigo,
-          modelo: nap.modelo,
-          ubicacion: nap.ubicacion,
-          estado: nap.estado,
-          fecha_instalacion: nap.createdAt
-        },
-        estadisticas: {
-          total_puertos: nap.total_puertos,
-          puertos_libres: puertosLibres,
-          puertos_ocupados: puertosOcupados,
-          puertos_mantenimiento: puertosMantenimiento,
-          porcentaje_ocupacion: porcentajeOcupacion
-        },
+        nap: { id: nap.id, codigo: nap.codigo, modelo: nap.modelo, ubicacion: nap.ubicacion, estado: nap.estado, fecha_instalacion: nap.createdAt },
+        estadisticas: { total_puertos: nap.total_puertos, puertos_libres: puertosLibres, puertos_ocupados: puertosOcupados, puertos_mantenimiento: puertosMantenimiento, porcentaje_ocupacion: porcentajeOcupacion },
         conexiones_activas: nap.puertos
           .filter(p => p.conexion)
-          .map(p => ({
-            puerto: p.numero,
-            cliente: p.conexion.cliente?.nombre || 'N/A',
-            ci: p.conexion.cliente?.ci || 'N/A',
-            plan: p.conexion.plan?.nombre || 'N/A',
-            velocidad: p.conexion.plan?.velocidad_mbps || 0
-          }))
+          .map(p => ({ puerto: p.numero, cliente: p.conexion.cliente?.nombre || 'N/A', ci: p.conexion.cliente?.ci || 'N/A', plan: p.conexion.plan?.nombre || 'N/A', velocidad: p.conexion.plan?.velocidad_mbps || 0 }))
       };
     });
 
     const resultado = {
-      success: true,
-      tipo: 'OCUPACION_NAPS',
-      fecha_generacion: new Date(),
-      parametros: { fecha_desde, fecha_hasta },
+      success: true, tipo: 'OCUPACION_NAPS', fecha_generacion: new Date(),
+      parametros: {},
       data: reporte,
       resumen: {
         total_naps: reporte.length,
-        total_puertos: reporte.reduce((sum, n) => sum + n.estadisticas.total_puertos, 0),
-        total_ocupados: reporte.reduce((sum, n) => sum + n.estadisticas.puertos_ocupados, 0),
-        promedio_ocupacion: Math.round(
-          reporte.reduce((sum, n) => sum + n.estadisticas.porcentaje_ocupacion, 0) / reporte.length
-        )
+        total_puertos: reporte.reduce((s, n) => s + n.estadisticas.total_puertos, 0),
+        total_ocupados: reporte.reduce((s, n) => s + n.estadisticas.puertos_ocupados, 0),
+        promedio_ocupacion: reporte.length > 0
+          ? Math.round(reporte.reduce((s, n) => s + n.estadisticas.porcentaje_ocupacion, 0) / reporte.length)
+          : 0
       }
     };
 
     return enviarReporteEnFormato(res, resultado, 'ocupacion_naps', formato);
   } catch (error) {
-    console.error('Error al generar reporte de ocupación:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
+    console.error('Error en reporteOcupacionNAPs:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
+// ─── Reporte 2: Consumo por cliente ──────────────────────────────────────────
 const reporteConsumoPorCliente = async (req, res) => {
   try {
     const { fecha_desde, fecha_hasta, cliente_id, formato = 'json' } = req.query;
 
     let whereCondition = {};
-    if (cliente_id) {
-      whereCondition.cliente_id = cliente_id;
-    }
-
-    let conexionWhere = {};
+    if (cliente_id) whereCondition.cliente_id = cliente_id;
     if (fecha_desde || fecha_hasta) {
-      conexionWhere.createdAt = {};
-      if (fecha_desde) {
-        conexionWhere.createdAt[Op.gte] = new Date(fecha_desde);
-      }
-      if (fecha_hasta) {
-        conexionWhere.createdAt[Op.lte] = new Date(fecha_hasta);
-      }
+      whereCondition.createdAt = {};
+      if (fecha_desde) whereCondition.createdAt[Op.gte] = new Date(fecha_desde);
+      if (fecha_hasta) whereCondition.createdAt[Op.lte] = finDelDia(fecha_hasta);
     }
 
     const conexiones = await Conexion.findAll({
-      where: { ...whereCondition, ...conexionWhere },
+      where: whereCondition,
       include: [
         { model: Cliente, as: 'cliente' },
         { model: Plan, as: 'plan' },
-        {
-          model: Puerto,
-          as: 'puerto',
-          include: [{ model: NAP, as: 'nap' }]
-        }
+        { model: Puerto, as: 'puerto', include: [{ model: NAP, as: 'nap' }] }
       ],
       order: [['cliente', 'nombre'], ['createdAt', 'DESC']]
     });
 
     const clientesMap = new Map();
-
     conexiones.forEach(conexion => {
       const clienteId = conexion.cliente.id;
-
       if (!clientesMap.has(clienteId)) {
         clientesMap.set(clienteId, {
-          cliente: {
-            id: conexion.cliente.id,
-            nombre: conexion.cliente.nombre,
-            ci: conexion.cliente.ci,
-            telefono: conexion.cliente.telefono,
-            correo: conexion.cliente.correo
-          },
+          cliente: { id: conexion.cliente.id, nombre: conexion.cliente.nombre, ci: conexion.cliente.ci, telefono: conexion.cliente.telefono, correo: conexion.cliente.correo },
           conexiones: [],
-          resumen: {
-            total_conexiones: 0,
-            conexiones_activas: 0,
-            conexiones_finalizadas: 0,
-            planes_utilizados: new Set()
-          }
+          resumen: { total_conexiones: 0, conexiones_activas: 0, conexiones_finalizadas: 0, planes_utilizados: new Set() }
         });
       }
 
-      const cliente = clientesMap.get(clienteId);
-
-      cliente.conexiones.push({
+      const c = clientesMap.get(clienteId);
+      c.conexiones.push({
         id: conexion.id,
         plan: conexion.plan.nombre,
         velocidad_mbps: conexion.plan.velocidad_mbps,
@@ -205,446 +146,436 @@ const reporteConsumoPorCliente = async (req, res) => {
         fecha_fin: conexion.fecha_fin,
         estado: conexion.estado,
         dias_activo: conexion.fecha_fin
-          ? Math.ceil((new Date(conexion.fecha_fin) - new Date(conexion.fecha_inicio)) / (1000 * 60 * 60 * 24))
-          : Math.ceil((new Date() - new Date(conexion.fecha_inicio)) / (1000 * 60 * 60 * 24))
+          ? Math.ceil((new Date(conexion.fecha_fin) - new Date(conexion.fecha_inicio)) / 86400000)
+          : Math.ceil((new Date() - new Date(conexion.fecha_inicio)) / 86400000)
       });
 
-      cliente.resumen.total_conexiones++;
-      if (conexion.estado === 'ACTIVA') cliente.resumen.conexiones_activas++;
-      if (conexion.estado === 'FINALIZADA') cliente.resumen.conexiones_finalizadas++;
-      cliente.resumen.planes_utilizados.add(conexion.plan.nombre);
+      c.resumen.total_conexiones++;
+      if (conexion.estado === 'ACTIVA') c.resumen.conexiones_activas++;
+      if (conexion.estado === 'FINALIZADA') c.resumen.conexiones_finalizadas++;
+      c.resumen.planes_utilizados.add(conexion.plan.nombre);
     });
 
-    const reporte = Array.from(clientesMap.values()).map(cliente => ({
-      ...cliente,
-      resumen: {
-        ...cliente.resumen,
-        planes_utilizados: Array.from(cliente.resumen.planes_utilizados)
-      }
+    const reporte = Array.from(clientesMap.values()).map(c => ({
+      ...c, resumen: { ...c.resumen, planes_utilizados: Array.from(c.resumen.planes_utilizados) }
     }));
 
     const resultado = {
-      success: true,
-      tipo: 'CONSUMO_POR_CLIENTE',
-      fecha_generacion: new Date(),
+      success: true, tipo: 'CONSUMO_POR_CLIENTE', fecha_generacion: new Date(),
       parametros: { fecha_desde, fecha_hasta, cliente_id },
       data: reporte,
       resumen: {
         total_clientes: reporte.length,
-        total_conexiones: reporte.reduce((sum, c) => sum + c.resumen.total_conexiones, 0),
-        conexiones_activas: reporte.reduce((sum, c) => sum + c.resumen.conexiones_activas, 0)
+        total_conexiones: reporte.reduce((s, c) => s + c.resumen.total_conexiones, 0),
+        conexiones_activas: reporte.reduce((s, c) => s + c.resumen.conexiones_activas, 0)
       }
     };
 
     return enviarReporteEnFormato(res, resultado, 'consumo_cliente', formato);
   } catch (error) {
-    console.error('Error al generar reporte de consumo:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
+    console.error('Error en reporteConsumoPorCliente:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
+// ─── Reporte 3: Estado técnico ────────────────────────────────────────────────
 const reporteEstadoTecnico = async (req, res) => {
   try {
-    const { fecha_desde, fecha_hasta, formato = 'json' } = req.query;
-
-    let whereCondition = {};
-    if (fecha_desde || fecha_hasta) {
-      whereCondition.createdAt = {};
-      if (fecha_desde) {
-        whereCondition.createdAt[Op.gte] = new Date(fecha_desde);
-      }
-      if (fecha_hasta) {
-        whereCondition.createdAt[Op.lte] = new Date(fecha_hasta);
-      }
-    }
+    const { formato = 'json' } = req.query;
 
     const naps = await NAP.findAll({
-      where: whereCondition,
       include: [
         {
-          model: Puerto,
-          as: 'puertos',
-          include: [{
-            model: Conexion,
-            as: 'conexion',
-            required: false,
-            where: { estado: 'ACTIVA' }
-          }]
+          model: Puerto, as: 'puertos',
+          include: [{ model: Conexion, as: 'conexion', required: false, where: { estado: 'ACTIVA' } }]
         },
         {
-          model: Mantenimiento,
-          as: 'mantenimientos',
+          model: Mantenimiento, as: 'mantenimientos',
           include: [{ model: Usuario, as: 'tecnico', attributes: ['nombre'] }],
-          limit: 5,
-          order: [['fecha', 'DESC']]
+          limit: 5, order: [['fecha', 'DESC']]
         }
       ]
     });
 
     const reporte = naps.map(nap => {
       const puertosOcupados = nap.puertos.filter(p => p.estado === 'OCUPADO').length;
-      const porcentajeOcupacion = Math.round((puertosOcupados / nap.total_puertos) * 100);
-
+      const porcentaje = nap.total_puertos > 0 ? Math.round((puertosOcupados / nap.total_puertos) * 100) : 0;
       let estadoTecnico = 'BUENO';
-      if (nap.estado === 'MANTENIMIENTO') {
-        estadoTecnico = 'MANTENIMIENTO';
-      } else if (nap.estado === 'SATURADO' || porcentajeOcupacion >= 90) {
-        estadoTecnico = 'CRITICO';
-      } else if (porcentajeOcupacion >= 75) {
-        estadoTecnico = 'ADVERTENCIA';
-      }
+      if (nap.estado === 'MANTENIMIENTO') estadoTecnico = 'MANTENIMIENTO';
+      else if (nap.estado === 'SATURADO' || porcentaje >= 90) estadoTecnico = 'CRITICO';
+      else if (porcentaje >= 75) estadoTecnico = 'ADVERTENCIA';
 
-      const ultimoMantenimiento = nap.mantenimientos[0];
-      const mantenimientosCorrectivos = nap.mantenimientos.filter(m => m.tipo === 'CORRECTIVO').length;
-
+      const ultimo = nap.mantenimientos[0];
       return {
-        nap: {
-          id: nap.id,
-          codigo: nap.codigo,
-          modelo: nap.modelo,
-          firmware: nap.firmware,
-          ubicacion: nap.ubicacion,
-          estado: nap.estado
-        },
+        nap: { id: nap.id, codigo: nap.codigo, modelo: nap.modelo, firmware: nap.firmware, ubicacion: nap.ubicacion, estado: nap.estado },
         estado_tecnico: estadoTecnico,
-        ocupacion: {
-          porcentaje: porcentajeOcupacion,
-          puertos_ocupados: puertosOcupados,
-          total_puertos: nap.total_puertos
-        },
+        ocupacion: { porcentaje, puertos_ocupados: puertosOcupados, total_puertos: nap.total_puertos },
         mantenimiento: {
-          ultimo_mantenimiento: ultimoMantenimiento ? {
-            fecha: ultimoMantenimiento.fecha,
-            tipo: ultimoMantenimiento.tipo,
-            tecnico: ultimoMantenimiento.tecnico?.nombre
-          } : null,
+          ultimo_mantenimiento: ultimo ? { fecha: ultimo.fecha, tipo: ultimo.tipo, tecnico: ultimo.tecnico?.nombre } : null,
           total_mantenimientos: nap.mantenimientos.length,
-          mantenimientos_correctivos: mantenimientosCorrectivos,
-          dias_desde_ultimo: ultimoMantenimiento
-            ? Math.ceil((new Date() - new Date(ultimoMantenimiento.fecha)) / (1000 * 60 * 60 * 24))
-            : null
+          mantenimientos_correctivos: nap.mantenimientos.filter(m => m.tipo === 'CORRECTIVO').length,
+          dias_desde_ultimo: ultimo ? Math.ceil((new Date() - new Date(ultimo.fecha)) / 86400000) : null
         }
       };
     });
 
-    const estadisticasGenerales = {
-      total_naps: reporte.length,
-      buenos: reporte.filter(n => n.estado_tecnico === 'BUENO').length,
-      advertencia: reporte.filter(n => n.estado_tecnico === 'ADVERTENCIA').length,
-      criticos: reporte.filter(n => n.estado_tecnico === 'CRITICO').length,
-      mantenimiento: reporte.filter(n => n.estado_tecnico === 'MANTENIMIENTO').length
-    };
-
     const resultado = {
-      success: true,
-      tipo: 'ESTADO_TECNICO',
-      fecha_generacion: new Date(),
-      parametros: { fecha_desde, fecha_hasta },
+      success: true, tipo: 'ESTADO_TECNICO', fecha_generacion: new Date(),
+      parametros: {},
       data: reporte,
-      resumen: estadisticasGenerales
+      resumen: {
+        total_naps: reporte.length,
+        buenos: reporte.filter(n => n.estado_tecnico === 'BUENO').length,
+        advertencia: reporte.filter(n => n.estado_tecnico === 'ADVERTENCIA').length,
+        criticos: reporte.filter(n => n.estado_tecnico === 'CRITICO').length,
+        mantenimiento: reporte.filter(n => n.estado_tecnico === 'MANTENIMIENTO').length
+      }
     };
 
     return enviarReporteEnFormato(res, resultado, 'estado_tecnico', formato);
   } catch (error) {
-    console.error('Error al generar reporte técnico:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
+    console.error('Error en reporteEstadoTecnico:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
-const reportePlanesPopulares = async (req, res) => {
+// ─── Reporte 4: Caídas e interrupciones ──────────────────────────────────────
+const reporteCaidasInterrupciones = async (req, res) => {
   try {
     const { fecha_desde, fecha_hasta, formato = 'json' } = req.query;
 
-    let whereCondition = { estado: 'ACTIVA' };
+    let whereCondition = { tipo: 'CORRECTIVO' };
     if (fecha_desde || fecha_hasta) {
-      whereCondition.createdAt = {};
-      if (fecha_desde) {
-        whereCondition.createdAt[Op.gte] = new Date(fecha_desde);
-      }
-      if (fecha_hasta) {
-        whereCondition.createdAt[Op.lte] = new Date(fecha_hasta);
-      }
+      whereCondition.fecha = {};
+      if (fecha_desde) whereCondition.fecha[Op.gte] = new Date(fecha_desde);
+      if (fecha_hasta) whereCondition.fecha[Op.lte] = finDelDia(fecha_hasta);
     }
 
-    // Obtener todas las conexiones activas con planes
-    const conexiones = await Conexion.findAll({
+    const mantenimientos = await Mantenimiento.findAll({
       where: whereCondition,
-      include: [{ model: Plan, as: 'plan' }]
+      include: [
+        {
+          model: NAP, as: 'nap',
+          include: [{
+            model: Puerto, as: 'puertos',
+            where: { estado: 'OCUPADO' },
+            required: false
+          }]
+        },
+        { model: Usuario, as: 'tecnico', attributes: ['nombre'] }
+      ],
+      order: [['fecha', 'DESC']]
     });
 
-    // Agrupar por plan
-    const planesMap = new Map();
-
-    conexiones.forEach(conexion => {
-      const planId = conexion.plan.id;
-      if (!planesMap.has(planId)) {
-        planesMap.set(planId, {
-          plan: {
-            id: conexion.plan.id,
-            nombre: conexion.plan.nombre,
-            velocidad_mbps: conexion.plan.velocidad_mbps,
-            precio: conexion.plan.precio || 0
-          },
-          total_contrataciones: 0,
-          porcentaje: 0,
-          ingreso_estimado: 0
-        });
-      }
-
-      const planData = planesMap.get(planId);
-      planData.total_contrataciones++;
-      planData.ingreso_estimado += conexion.plan.precio || 0;
-    });
-
-    // Convertir a array y calcular porcentajes
-    const totalConexiones = conexiones.length;
-    const planesArray = Array.from(planesMap.values()).map(plan => ({
-      ...plan,
-      porcentaje: Math.round((plan.total_contrataciones / totalConexiones) * 100)
+    const reporte = mantenimientos.map(m => ({
+      id: m.id,
+      fecha: m.fecha,
+      nap_codigo: m.nap.codigo,
+      nap_modelo: m.nap.modelo,
+      nap_ubicacion: m.nap.ubicacion,
+      nap_estado_actual: m.nap.estado,
+      causa: m.descripcion,
+      usuarios_afectados: m.nap.puertos ? m.nap.puertos.length : 0,
+      tecnico_responsable: m.tecnico?.nombre || 'N/A'
     }));
 
-    // Ordenar por popularidad
-    planesArray.sort((a, b) => b.total_contrataciones - a.total_contrataciones);
-
-    // Calcular estadísticas
-    const velocidadPromedio = planesArray.reduce((sum, p) =>
-      sum + (p.plan.velocidad_mbps * p.total_contrataciones), 0) / totalConexiones;
-
-    const ingresoTotal = planesArray.reduce((sum, p) => sum + p.ingreso_estimado, 0);
+    const napsUnicas = new Set(reporte.map(r => r.nap_codigo)).size;
 
     const resultado = {
-      success: true,
-      tipo: 'PLANES_POPULARES',
-      fecha_generacion: new Date(),
+      success: true, tipo: 'CAIDAS_INTERRUPCIONES', fecha_generacion: new Date(),
       parametros: { fecha_desde, fecha_hasta },
-      data: planesArray,
+      data: reporte,
       resumen: {
-        total_planes: planesArray.length,
-        total_conexiones: totalConexiones,
-        velocidad_promedio_mbps: Math.round(velocidadPromedio),
-        ingreso_mensual_estimado: `$${Math.round(ingresoTotal).toLocaleString()}`,
-        plan_mas_popular: planesArray[0]?.plan.nombre || 'N/A',
-        contrataciones_mas_popular: planesArray[0]?.total_contrataciones || 0,
-        plan_menos_popular: planesArray[planesArray.length - 1]?.plan.nombre || 'N/A',
-        contrataciones_menos_popular: planesArray[planesArray.length - 1]?.total_contrataciones || 0
+        total_incidentes: reporte.length,
+        naps_afectadas: napsUnicas,
+        total_usuarios_afectados: reporte.reduce((s, r) => s + r.usuarios_afectados, 0),
+        promedio_usuarios_por_incidente: reporte.length > 0
+          ? Math.round(reporte.reduce((s, r) => s + r.usuarios_afectados, 0) / reporte.length)
+          : 0
       }
     };
 
-    return enviarReporteEnFormato(res, resultado, 'planes_populares', formato);
+    return enviarReporteEnFormato(res, resultado, 'caidas_interrupciones', formato);
   } catch (error) {
-    console.error('Error al generar reporte de planes populares:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
+    console.error('Error en reporteCaidasInterrupciones:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
-const reporteTendenciasPlanes = async (req, res) => {
-  try {
-    const { meses = 6, formato = 'json' } = req.query;
-
-    // Calcular fechas para los últimos N meses
-    const fechaActual = new Date();
-    const resultados = [];
-
-    for (let i = parseInt(meses) - 1; i >= 0; i--) {
-      const fechaInicio = new Date(fechaActual.getFullYear(), fechaActual.getMonth() - i, 1);
-      const fechaFin = new Date(fechaActual.getFullYear(), fechaActual.getMonth() - i + 1, 0);
-
-      const conexiones = await Conexion.findAll({
-        where: {
-          createdAt: {
-            [Op.gte]: fechaInicio,
-            [Op.lte]: fechaFin
-          }
-        },
-        include: [{ model: Plan, as: 'plan' }]
-      });
-
-      // Agrupar por plan
-      const planesDelMes = {};
-      conexiones.forEach(conexion => {
-        const planNombre = conexion.plan.nombre;
-        if (!planesDelMes[planNombre]) {
-          planesDelMes[planNombre] = 0;
-        }
-        planesDelMes[planNombre]++;
-      });
-
-      resultados.push({
-        mes: fechaInicio.toISOString().substring(0, 7), // YYYY-MM
-        total_nuevas_conexiones: conexiones.length,
-        planes: planesDelMes
-      });
-    }
-
-    const resultado = {
-      success: true,
-      tipo: 'TENDENCIAS_PLANES',
-      fecha_generacion: new Date(),
-      parametros: { meses },
-      data: resultados,
-      resumen: {
-        total_meses: resultados.length,
-        conexiones_totales: resultados.reduce((sum, m) => sum + m.total_nuevas_conexiones, 0),
-        promedio_mensual: Math.round(
-          resultados.reduce((sum, m) => sum + m.total_nuevas_conexiones, 0) / resultados.length
-        )
-      }
-    };
-
-    return enviarReporteEnFormato(res, resultado, 'tendencias_planes', formato);
-  } catch (error) {
-    console.error('Error al generar reporte de tendencias:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
-  }
-};
-
-const reporteAnalisisVelocidades = async (req, res) => {
+// ─── Reporte 5: Disponibilidad de servicio ────────────────────────────────────
+const reporteDisponibilidadServicio = async (req, res) => {
   try {
     const { fecha_desde, fecha_hasta, formato = 'json' } = req.query;
 
-    let whereCondition = { estado: 'ACTIVA' };
-    if (fecha_desde || fecha_hasta) {
-      whereCondition.createdAt = {};
-      if (fecha_desde) {
-        whereCondition.createdAt[Op.gte] = new Date(fecha_desde);
-      }
-      if (fecha_hasta) {
-        whereCondition.createdAt[Op.lte] = new Date(fecha_hasta);
-      }
-    }
+    const fechaInicio = fecha_desde ? new Date(fecha_desde) : new Date(Date.now() - 30 * 86400000);
+    const fechaFin = fecha_hasta ? finDelDia(fecha_hasta) : new Date();
+    const diasPeriodo = Math.max(1, Math.ceil((fechaFin - fechaInicio) / 86400000));
 
-    const conexiones = await Conexion.findAll({
-      where: whereCondition,
-      include: [{ model: Plan, as: 'plan' }]
+    let mantWhere = { tipo: 'CORRECTIVO', fecha: { [Op.gte]: fechaInicio, [Op.lte]: fechaFin } };
+
+    const naps = await NAP.findAll({
+      include: [
+        {
+          model: Mantenimiento, as: 'mantenimientos',
+          where: mantWhere, required: false,
+          include: [{ model: Usuario, as: 'tecnico', attributes: ['nombre'] }]
+        },
+        {
+          model: Puerto, as: 'puertos',
+          where: { estado: 'OCUPADO' }, required: false
+        }
+      ],
+      order: [['codigo', 'ASC']]
     });
 
-    // Agrupar por rangos de velocidad
-    const rangos = {
-      '0-20': { rango: '0-20 Mbps', cantidad: 0, porcentaje: 0 },
-      '21-50': { rango: '21-50 Mbps', cantidad: 0, porcentaje: 0 },
-      '51-100': { rango: '51-100 Mbps', cantidad: 0, porcentaje: 0 },
-      '101-200': { rango: '101-200 Mbps', cantidad: 0, porcentaje: 0 },
-      '201+': { rango: '201+ Mbps', cantidad: 0, porcentaje: 0 }
-    };
+    const reporte = naps.map(nap => {
+      const incidentes = nap.mantenimientos.length;
+      // Estimación conservadora: 4 horas de interrupción por incidente correctivo
+      const horasEstimFuera = incidentes * 4;
+      const horasPeriodo = diasPeriodo * 24;
+      const disponibilidad = Math.max(0, Math.round(((horasPeriodo - horasEstimFuera) / horasPeriodo) * 1000) / 10);
 
-    conexiones.forEach(conexion => {
-      const velocidad = conexion.plan.velocidad_mbps;
-      if (velocidad <= 20) rangos['0-20'].cantidad++;
-      else if (velocidad <= 50) rangos['21-50'].cantidad++;
-      else if (velocidad <= 100) rangos['51-100'].cantidad++;
-      else if (velocidad <= 200) rangos['101-200'].cantidad++;
-      else rangos['201+'].cantidad++;
+      const ultimo = nap.mantenimientos
+        .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
+
+      return {
+        nap_codigo: nap.codigo,
+        nap_modelo: nap.modelo,
+        nap_ubicacion: nap.ubicacion,
+        estado_actual: nap.estado,
+        disponibilidad_porcentaje: disponibilidad,
+        incidentes_en_periodo: incidentes,
+        horas_estimadas_fuera: horasEstimFuera,
+        clientes_activos: nap.puertos ? nap.puertos.length : 0,
+        ultimo_incidente: ultimo ? ultimo.fecha : null
+      };
     });
-
-    // Calcular porcentajes
-    const total = conexiones.length;
-    Object.keys(rangos).forEach(key => {
-      rangos[key].porcentaje = Math.round((rangos[key].cantidad / total) * 100);
-    });
-
-    // Calcular velocidad promedio
-    const velocidadPromedio = conexiones.reduce((sum, c) =>
-      sum + c.plan.velocidad_mbps, 0) / total;
 
     const resultado = {
-      success: true,
-      tipo: 'ANALISIS_VELOCIDADES',
-      fecha_generacion: new Date(),
-      parametros: { fecha_desde, fecha_hasta },
-      data: Object.values(rangos),
+      success: true, tipo: 'DISPONIBILIDAD_SERVICIO', fecha_generacion: new Date(),
+      parametros: { fecha_desde: fechaInicio.toISOString().slice(0, 10), fecha_hasta: fechaFin.toISOString().slice(0, 10) },
+      data: reporte,
       resumen: {
-        total_conexiones: total,
-        velocidad_promedio_mbps: Math.round(velocidadPromedio),
-        velocidad_minima_mbps: Math.min(...conexiones.map(c => c.plan.velocidad_mbps)),
-        velocidad_maxima_mbps: Math.max(...conexiones.map(c => c.plan.velocidad_mbps)),
-        rango_mas_popular: Object.values(rangos).sort((a, b) => b.cantidad - a.cantidad)[0].rango
+        total_naps: reporte.length,
+        disponibilidad_promedio_pct: reporte.length > 0
+          ? Math.round(reporte.reduce((s, n) => s + n.disponibilidad_porcentaje, 0) / reporte.length * 10) / 10
+          : 100,
+        naps_sin_incidentes: reporte.filter(n => n.incidentes_en_periodo === 0).length,
+        total_incidentes: reporte.reduce((s, n) => s + n.incidentes_en_periodo, 0),
+        dias_periodo: diasPeriodo
       }
     };
 
-    return enviarReporteEnFormato(res, resultado, 'analisis_velocidades', formato);
+    return enviarReporteEnFormato(res, resultado, 'disponibilidad_servicio', formato);
   } catch (error) {
-    console.error('Error al generar reporte de velocidades:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
+    console.error('Error en reporteDisponibilidadServicio:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
+// ─── Reporte 6: Altas y bajas de servicio ─────────────────────────────────────
+const reporteAltasYBajas = async (req, res) => {
+  try {
+    const { fecha_desde, fecha_hasta, formato = 'json' } = req.query;
+
+    const fechaInicioStr = fecha_desde || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const fechaFinStr = fecha_hasta || new Date().toISOString().slice(0, 10);
+    const fechaInicio = new Date(fechaInicioStr);
+    const fechaFin = finDelDia(fechaFinStr);
+
+    const altas = await Conexion.findAll({
+      where: { fecha_inicio: { [Op.gte]: fechaInicioStr, [Op.lte]: fechaFinStr } },
+      include: [
+        { model: Cliente, as: 'cliente', attributes: ['nombre', 'apellido', 'ci', 'telefono'] },
+        { model: Plan, as: 'plan', attributes: ['nombre', 'velocidad_mbps'] },
+        { model: Puerto, as: 'puerto', include: [{ model: NAP, as: 'nap', attributes: ['codigo', 'ubicacion'] }] }
+      ],
+      order: [['fecha_inicio', 'DESC']]
+    });
+
+    const bajas = await Conexion.findAll({
+      where: {
+        estado: 'FINALIZADA',
+        [Op.or]: [
+          { fecha_fin: { [Op.gte]: fechaInicioStr, [Op.lte]: fechaFinStr } },
+          { updatedAt: { [Op.gte]: fechaInicio, [Op.lte]: fechaFin } }
+        ]
+      },
+      include: [
+        { model: Cliente, as: 'cliente', attributes: ['nombre', 'apellido', 'ci', 'telefono'] },
+        { model: Plan, as: 'plan', attributes: ['nombre', 'velocidad_mbps'] }
+      ],
+      order: [['fecha_fin', 'DESC']]
+    });
+
+    const data = [
+      ...altas.map(c => ({
+        movimiento: 'ALTA',
+        fecha: c.fecha_inicio,
+        cliente: [c.cliente?.nombre, c.cliente?.apellido].filter(Boolean).join(' ') || 'N/A',
+        ci: c.cliente?.ci || 'N/A',
+        telefono: c.cliente?.telefono || 'N/A',
+        plan: c.plan?.nombre || 'N/A',
+        velocidad_mbps: c.plan?.velocidad_mbps || 0,
+        nap: c.puerto?.nap?.codigo || 'N/A',
+        ubicacion: c.puerto?.nap?.ubicacion || 'N/A',
+        estado_conexion: c.estado
+      })),
+      ...bajas.map(c => ({
+        movimiento: 'BAJA',
+        fecha: c.fecha_fin || c.updatedAt,
+        cliente: [c.cliente?.nombre, c.cliente?.apellido].filter(Boolean).join(' ') || 'N/A',
+        ci: c.cliente?.ci || 'N/A',
+        telefono: c.cliente?.telefono || 'N/A',
+        plan: c.plan?.nombre || 'N/A',
+        velocidad_mbps: c.plan?.velocidad_mbps || 0,
+        nap: 'N/A',
+        ubicacion: 'N/A',
+        estado_conexion: c.estado
+      }))
+    ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    const resultado = {
+      success: true, tipo: 'ALTAS_BAJAS', fecha_generacion: new Date(),
+      parametros: { fecha_desde: fechaInicioStr, fecha_hasta: fechaFinStr },
+      data,
+      resumen: {
+        total_altas: altas.length,
+        total_bajas: bajas.length,
+        movimiento_neto: altas.length - bajas.length,
+        periodo_dias: Math.ceil((fechaFin - fechaInicio) / 86400000)
+      }
+    };
+
+    return enviarReporteEnFormato(res, resultado, 'altas_bajas', formato);
+  } catch (error) {
+    console.error('Error en reporteAltasYBajas:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+};
+
+// ─── Reporte 7: Reporte de clientes ──────────────────────────────────────────
+const reporteClientes = async (req, res) => {
+  try {
+    const { formato = 'json' } = req.query;
+
+    const clientes = await Cliente.findAll({
+      include: [{
+        model: Conexion, as: 'conexiones',
+        include: [
+          { model: Plan, as: 'plan', attributes: ['nombre', 'velocidad_mbps'] },
+          { model: Puerto, as: 'puerto', include: [{ model: NAP, as: 'nap', attributes: ['codigo', 'ubicacion'] }] }
+        ]
+      }],
+      order: [['nombre', 'ASC']]
+    });
+
+    const reporte = clientes.map(c => {
+      const activa = c.conexiones.find(x => x.estado === 'ACTIVA');
+      const suspendida = c.conexiones.find(x => x.estado === 'SUSPENDIDA');
+      const estadoServicio = activa ? 'ACTIVO' : suspendida ? 'SUSPENDIDO' : (c.conexiones.length > 0 ? 'INACTIVO' : 'SIN_SERVICIO');
+
+      return {
+        nombre: [c.nombre, c.apellido].filter(Boolean).join(' '),
+        ci: c.ci,
+        telefono: c.telefono || 'N/A',
+        correo: c.correo || 'N/A',
+        direccion: c.direccion || 'N/A',
+        estado_servicio: estadoServicio,
+        plan_actual: activa?.plan?.nombre || suspendida?.plan?.nombre || 'N/A',
+        velocidad_mbps: activa?.plan?.velocidad_mbps || suspendida?.plan?.velocidad_mbps || 0,
+        nap: activa?.puerto?.nap?.codigo || suspendida?.puerto?.nap?.codigo || 'N/A',
+        ubicacion_nap: activa?.puerto?.nap?.ubicacion || 'N/A',
+        fecha_alta_servicio: activa?.fecha_inicio || null,
+        total_conexiones_historicas: c.conexiones.length
+      };
+    });
+
+    const resultado = {
+      success: true, tipo: 'CLIENTES_ESTADO', fecha_generacion: new Date(),
+      parametros: {},
+      data: reporte,
+      resumen: {
+        total_clientes: reporte.length,
+        clientes_activos: reporte.filter(c => c.estado_servicio === 'ACTIVO').length,
+        clientes_suspendidos: reporte.filter(c => c.estado_servicio === 'SUSPENDIDO').length,
+        clientes_inactivos: reporte.filter(c => c.estado_servicio === 'INACTIVO').length,
+        sin_servicio: reporte.filter(c => c.estado_servicio === 'SIN_SERVICIO').length
+      }
+    };
+
+    return enviarReporteEnFormato(res, resultado, 'clientes_estado', formato);
+  } catch (error) {
+    console.error('Error en reporteClientes:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+};
+
+// ─── Tipos disponibles ────────────────────────────────────────────────────────
 const obtenerTiposReporte = async (req, res) => {
   try {
     const tipos = [
       {
         id: 'ocupacion',
-        nombre: 'Reporte de Ocupación por NAP',
-        descripcion: 'Muestra el estado de ocupación de puertos por cada NAP',
+        nombre: 'Ocupación por NAP',
+        descripcion: 'Estado actual de ocupación de puertos por cada NAP y conexiones activas',
+        categoria: 'Infraestructura',
+        parametros: [],
+        formatos: ['json', 'pdf', 'excel']
+      },
+      {
+        id: 'tecnico',
+        nombre: 'Estado Técnico de NAPs',
+        descripcion: 'Estado técnico actual, ocupación y últimos mantenimientos de cada NAP',
+        categoria: 'Infraestructura',
+        parametros: [],
+        formatos: ['json', 'pdf', 'excel']
+      },
+      {
+        id: 'caidas-interrupciones',
+        nombre: 'Caídas e Interrupciones',
+        descripcion: 'Registro de fallas correctivas: fecha, NAP afectada, causa y usuarios impactados',
+        categoria: 'Infraestructura',
+        parametros: ['fecha_desde', 'fecha_hasta'],
+        formatos: ['json', 'pdf', 'excel']
+      },
+      {
+        id: 'disponibilidad',
+        nombre: 'Disponibilidad de Servicio',
+        descripcion: 'Porcentaje de disponibilidad por NAP estimado a partir de incidentes correctivos',
         categoria: 'Infraestructura',
         parametros: ['fecha_desde', 'fecha_hasta'],
         formatos: ['json', 'pdf', 'excel']
       },
       {
         id: 'consumo',
-        nombre: 'Reporte de Consumo por Cliente',
-        descripcion: 'Detalle del consumo y conexiones por cliente',
+        nombre: 'Consumo por Cliente',
+        descripcion: 'Detalle del historial de conexiones y planes utilizados por cliente',
         categoria: 'Clientes',
         parametros: ['fecha_desde', 'fecha_hasta', 'cliente_id'],
         formatos: ['json', 'pdf', 'excel']
       },
       {
-        id: 'tecnico',
-        nombre: 'Reporte de Estado Técnico',
-        descripcion: 'Estado técnico y mantenimientos de los NAPs',
-        categoria: 'Infraestructura',
+        id: 'altas-bajas',
+        nombre: 'Altas y Bajas de Servicio',
+        descripcion: 'Movimiento de clientes en el periodo: nuevas contrataciones y cancelaciones',
+        categoria: 'Clientes',
         parametros: ['fecha_desde', 'fecha_hasta'],
         formatos: ['json', 'pdf', 'excel']
       },
       {
-        id: 'planes-populares',
-        nombre: 'Planes Más Populares',
-        descripcion: 'Ranking de planes por cantidad de contrataciones e ingresos',
-        categoria: 'Comercial',
-        parametros: ['fecha_desde', 'fecha_hasta'],
-        formatos: ['json', 'pdf', 'excel']
-      },
-      {
-        id: 'tendencias-planes',
-        nombre: 'Tendencias de Contratación',
-        descripcion: 'Evolución de contrataciones por plan en los últimos meses',
-        categoria: 'Comercial',
-        parametros: ['meses'],
-        formatos: ['json', 'pdf', 'excel']
-      },
-      {
-        id: 'analisis-velocidades',
-        nombre: 'Análisis de Velocidades',
-        descripcion: 'Distribución de clientes por rangos de velocidad',
-        categoria: 'Comercial',
-        parametros: ['fecha_desde', 'fecha_hasta'],
+        id: 'clientes',
+        nombre: 'Reporte de Clientes',
+        descripcion: 'Lista completa de clientes con su estado de servicio, plan y NAP asignada',
+        categoria: 'Clientes',
+        parametros: [],
         formatos: ['json', 'pdf', 'excel']
       }
     ];
 
-    res.json({
-      success: true,
-      data: tipos
-    });
+    res.json({ success: true, data: tipos });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
@@ -652,8 +583,9 @@ module.exports = {
   reporteOcupacionNAPs,
   reporteConsumoPorCliente,
   reporteEstadoTecnico,
-  reportePlanesPopulares,
-  reporteTendenciasPlanes,
-  reporteAnalisisVelocidades,
+  reporteCaidasInterrupciones,
+  reporteDisponibilidadServicio,
+  reporteAltasYBajas,
+  reporteClientes,
   obtenerTiposReporte
 };

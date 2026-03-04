@@ -50,6 +50,7 @@ export class AuditoriaComponent implements OnInit {
   // Modal de detalles
   mostrarModalDetalles = signal(false);
   auditoriaSeleccionada = signal<Auditoria | null>(null);
+  vistaJson = signal(false);
 
   // Vista de estadísticas
   mostrarEstadisticas = signal(false);
@@ -162,6 +163,7 @@ export class AuditoriaComponent implements OnInit {
 
   verDetalles(auditoria: Auditoria) {
     this.auditoriaSeleccionada.set(auditoria);
+    this.vistaJson.set(false);
     this.mostrarModalDetalles.set(true);
   }
 
@@ -225,6 +227,55 @@ export class AuditoriaComponent implements OnInit {
     }
 
     return cambios.length > 0 ? cambios : ['Sin cambios detectados'];
+  }
+
+  private readonly CAMPOS_LEGIBLES: Record<string, string> = {
+    id: 'ID', nombre: 'Nombre', apellido: 'Apellido', correo: 'Correo',
+    telefono: 'Teléfono', direccion: 'Dirección', ci: 'Cédula', rol: 'Rol',
+    activo: 'Activo', clave: 'Contraseña', codigo: 'Código', modelo: 'Modelo',
+    firmware: 'Firmware', estado: 'Estado', total_puertos: 'Total Puertos',
+    ubicacion: 'Ubicación', latitud: 'Latitud', longitud: 'Longitud',
+    velocidad_mbps: 'Velocidad (Mbps)', descripcion: 'Descripción', numero: 'Número',
+    nota: 'Nota', nap_id: 'ID NAP', puerto_id: 'ID Puerto', cliente_id: 'ID Cliente',
+    plan_id: 'ID Plan', creado_por: 'Creado por', realizado_por: 'Realizado por',
+    fecha_inicio: 'Fecha Inicio', fecha_fin: 'Fecha Fin', fecha: 'Fecha',
+    tipo: 'Tipo', createdAt: 'Creado en', updatedAt: 'Actualizado en',
+  };
+
+  private readonly CAMPOS_OCULTOS = new Set(['clave', 'updatedAt', 'createdAt']);
+
+  getNombreCampoLegible(campo: string): string {
+    return this.CAMPOS_LEGIBLES[campo] ?? campo;
+  }
+
+  formatearValor(campo: string, valor: any): string {
+    if (valor === null || valor === undefined) return '—';
+    if (campo === 'clave') return '••••••••';
+    if (typeof valor === 'boolean') return valor ? 'Sí' : 'No';
+    if (campo === 'activo') return valor ? 'Activo' : 'Inactivo';
+    const s = String(valor);
+    if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+      return new Date(s).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' });
+    }
+    return s;
+  }
+
+  getEntradasDatos(datos: any): { campo: string; valor: any }[] {
+    if (!datos || typeof datos !== 'object') return [];
+    return Object.entries(datos)
+      .filter(([k]) => !this.CAMPOS_OCULTOS.has(k))
+      .map(([campo, valor]) => ({ campo, valor }));
+  }
+
+  getCambiosDetallados(auditoria: Auditoria): { campo: string; anterior: any; nuevo: any }[] {
+    if (auditoria.accion !== 'UPDATE' || !auditoria.datos_nuevos) return [];
+    return Object.entries(auditoria.datos_nuevos)
+      .filter(([k]) => !this.CAMPOS_OCULTOS.has(k))
+      .map(([campo, nuevo]) => ({
+        campo,
+        anterior: auditoria.datos_anteriores?.[campo],
+        nuevo,
+      }));
   }
 
   exportarAExcel() {

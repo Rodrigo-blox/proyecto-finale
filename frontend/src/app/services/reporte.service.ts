@@ -7,7 +7,7 @@ export interface TipoReporte {
   id: string;
   nombre: string;
   descripcion: string;
-  categoria: 'Infraestructura' | 'Clientes' | 'Comercial';
+  categoria: 'Infraestructura' | 'Clientes';
   parametros: string[];
   formatos: string[];
 }
@@ -169,11 +169,12 @@ export class ReporteService {
   private getEndpointPorTipo(tipo: string): string {
     const endpoints: { [key: string]: string } = {
       'ocupacion': 'ocupacion',
-      'consumo': 'consumo',
       'tecnico': 'tecnico',
-      'planes-populares': 'planes-populares',
-      'tendencias-planes': 'tendencias-planes',
-      'analisis-velocidades': 'analisis-velocidades'
+      'caidas-interrupciones': 'caidas-interrupciones',
+      'disponibilidad': 'disponibilidad',
+      'consumo': 'consumo',
+      'altas-bajas': 'altas-bajas',
+      'clientes': 'clientes'
     };
 
     return endpoints[tipo] || tipo;

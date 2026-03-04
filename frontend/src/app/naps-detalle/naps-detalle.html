@@ -405,9 +405,160 @@
             }
           }
         </div>
+        <!-- Historial de Mantenimientos -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Historial de Mantenimientos</h3>
+              <p class="text-xs text-gray-500 mt-0.5">Los mantenimientos correctivos quedan registrados como caídas en los reportes</p>
+            </div>
+            <button
+              (click)="abrirModalMantenimiento()"
+              class="px-4 py-2 bg-black text-white text-sm rounded-lg hover:bg-gray-800 transition-colors flex items-center space-x-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              <span>Registrar Mantenimiento</span>
+            </button>
+          </div>
+
+          @if (mantenimientos().length === 0) {
+            <div class="text-center py-10 text-gray-400">
+              <svg class="w-12 h-12 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"></path>
+              </svg>
+              <p class="text-sm">Sin mantenimientos registrados</p>
+            </div>
+          } @else {
+            <div class="space-y-3">
+              @for (m of mantenimientos(); track m.id) {
+                <div class="flex items-start space-x-4 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+                  <span class="mt-0.5 px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap {{ getTipoMantenimientoBadge(m.tipo) }}">
+                    {{ m.tipo }}
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm text-gray-800">{{ m.descripcion }}</p>
+                    <p class="text-xs text-gray-400 mt-1">
+                      {{ m.fecha | date:'dd/MM/yyyy HH:mm' }}
+                      @if (m.tecnico) { · {{ m.tecnico.nombre }} }
+                    </p>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
       </main>
     }
   </div>
+
+  <!-- Modal para registrar mantenimiento -->
+  @if (mostrarModalMantenimiento()) {
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg">
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-5">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Registrar Mantenimiento</h2>
+              <p class="text-xs text-gray-500 mt-0.5">NAP {{ nap()!.codigo }}</p>
+            </div>
+            <button (click)="cerrarModalMantenimiento()" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <div class="space-y-4">
+            <!-- Tipo -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de mantenimiento*</label>
+              <div class="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  (click)="setTipoMantenimiento('CORRECTIVO')"
+                  [class]="formMantenimiento().tipo === 'CORRECTIVO'
+                    ? 'flex flex-col items-center p-3 rounded-lg border-2 border-red-500 bg-red-50 text-red-700'
+                    : 'flex flex-col items-center p-3 rounded-lg border-2 border-gray-200 hover:border-gray-300 text-gray-600'"
+                >
+                  <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                  </svg>
+                  <span class="text-sm font-medium">Correctivo</span>
+                  <span class="text-xs mt-0.5 opacity-75">Falla / Caída</span>
+                </button>
+                <button
+                  type="button"
+                  (click)="setTipoMantenimiento('PREVENTIVO')"
+                  [class]="formMantenimiento().tipo === 'PREVENTIVO'
+                    ? 'flex flex-col items-center p-3 rounded-lg border-2 border-blue-500 bg-blue-50 text-blue-700'
+                    : 'flex flex-col items-center p-3 rounded-lg border-2 border-gray-200 hover:border-gray-300 text-gray-600'"
+                >
+                  <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="text-sm font-medium">Preventivo</span>
+                  <span class="text-xs mt-0.5 opacity-75">Revisión rutinaria</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Descripción / Causa -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                {{ formMantenimiento().tipo === 'CORRECTIVO' ? 'Causa de la falla*' : 'Descripción del mantenimiento*' }}
+              </label>
+              <textarea
+                rows="3"
+                [value]="formMantenimiento().descripcion"
+                (input)="updateFormMantenimiento('descripcion', $event)"
+                [placeholder]="formMantenimiento().tipo === 'CORRECTIVO' ? 'Ej: Corte de fibra en nodo principal, equipo sin energía...' : 'Ej: Revisión y limpieza de conectores, actualización de firmware...'"
+                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+              ></textarea>
+            </div>
+
+            <!-- Fecha -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora del evento*</label>
+              <input
+                type="datetime-local"
+                [value]="formMantenimiento().fecha"
+                (input)="updateFormMantenimiento('fecha', $event)"
+                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+              />
+            </div>
+
+            @if (formMantenimiento().tipo === 'CORRECTIVO') {
+              <div class="bg-orange-50 border border-orange-200 rounded-lg p-3 text-xs text-orange-700">
+                Al registrar un mantenimiento <strong>correctivo</strong>, el estado de la NAP cambiará automáticamente a <strong>MANTENIMIENTO</strong> y quedará registrado como caída en los reportes.
+              </div>
+            }
+          </div>
+
+          <div class="flex space-x-3 mt-6">
+            <button
+              type="button"
+              (click)="cerrarModalMantenimiento()"
+              class="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              (click)="registrarMantenimiento()"
+              [disabled]="guardandoMantenimiento() || !formMantenimiento().descripcion.trim()"
+              [class]="formMantenimiento().tipo === 'CORRECTIVO'
+                ? 'flex-1 bg-red-600 text-white py-2.5 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed'
+                : 'flex-1 bg-black text-white py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed'"
+            >
+              {{ guardandoMantenimiento() ? 'Registrando...' : 'Registrar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
 
   <!-- Modal para asignar cliente y plan -->
   @if (mostrarModalAsignar() && puertoSeleccionado()) {

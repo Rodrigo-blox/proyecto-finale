@@ -22,7 +22,7 @@ export class ReportesComponent implements OnInit {
   error = signal<string | null>(null);
 
   // Filtros por categoría
-  categoriaSeleccionada = signal<'TODAS' | 'Infraestructura' | 'Clientes' | 'Comercial'>('TODAS');
+  categoriaSeleccionada = signal<'TODAS' | 'Infraestructura' | 'Clientes'>('TODAS');
 
   // Parámetros del reporte
   parametros = signal<any>({
@@ -31,6 +31,8 @@ export class ReportesComponent implements OnInit {
     cliente_id: '',
     meses: 6
   });
+
+  periodoRapido = signal<string>('semana');
 
   // Reportes filtrados por categoría
   tiposFiltrados = computed(() => {
@@ -66,14 +68,47 @@ export class ReportesComponent implements OnInit {
     this.reporteSeleccionado.set(tipo);
     this.resultadoReporte.set(null);
     this.error.set(null);
+    this.parametros.set({ fecha_desde: '', fecha_hasta: '', cliente_id: '', meses: 6 });
 
-    // Resetear parámetros
-    this.parametros.set({
-      fecha_desde: '',
-      fecha_hasta: '',
-      cliente_id: '',
-      meses: 6
-    });
+    // Si el reporte usa fechas, aplicar "última semana" por defecto
+    if (tipo.parametros.includes('fecha_desde')) {
+      this.setPeriodoRapido('semana');
+    } else {
+      this.periodoRapido.set('');
+    }
+  }
+
+  private toDateStr(d: Date): string {
+    return d.toISOString().split('T')[0];
+  }
+
+  setPeriodoRapido(periodo: string) {
+    this.periodoRapido.set(periodo);
+    const hoy = new Date();
+    const hasta = this.toDateStr(hoy);
+    let desde: string;
+
+    switch (periodo) {
+      case 'semana':
+        desde = this.toDateStr(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 7));
+        break;
+      case 'mes':
+        desde = this.toDateStr(new Date(hoy.getFullYear(), hoy.getMonth() - 1, hoy.getDate()));
+        break;
+      case '3meses':
+        desde = this.toDateStr(new Date(hoy.getFullYear(), hoy.getMonth() - 3, hoy.getDate()));
+        break;
+      case '6meses':
+        desde = this.toDateStr(new Date(hoy.getFullYear(), hoy.getMonth() - 6, hoy.getDate()));
+        break;
+      case 'anio':
+        desde = this.toDateStr(new Date(hoy.getFullYear() - 1, hoy.getMonth(), hoy.getDate()));
+        break;
+      default:
+        return;
+    }
+
+    this.parametros.update(p => ({ ...p, fecha_desde: desde, fecha_hasta: hasta }));
   }
 
   generarReporte() {
@@ -153,6 +188,9 @@ export class ReportesComponent implements OnInit {
   actualizarParametro(campo: string, event: Event) {
     const valor = (event.target as HTMLInputElement).value;
     this.parametros.update(p => ({ ...p, [campo]: valor }));
+    if (campo === 'fecha_desde' || campo === 'fecha_hasta') {
+      this.periodoRapido.set('');
+    }
   }
 
   volver() {
@@ -170,7 +208,6 @@ export class ReportesComponent implements OnInit {
     switch (categoria) {
       case 'Infraestructura': return '🏗️';
       case 'Clientes': return '👥';
-      case 'Comercial': return '💰';
       default: return '📊';
     }
   }
@@ -179,7 +216,6 @@ export class ReportesComponent implements OnInit {
     switch (categoria) {
       case 'Infraestructura': return 'bg-blue-100 text-blue-800';
       case 'Clientes': return 'bg-green-100 text-green-800';
-      case 'Comercial': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   }
