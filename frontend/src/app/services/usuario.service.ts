@@ -98,6 +98,6 @@ export class UsuarioService {
   }
 
   activarUsuario(id: string): Observable<RespuestaUsuario> {
-    return this.http.put<RespuestaUsuario>(`${this.apiUrl}/${id}`, { activo: true });
+    return this.http.patch<RespuestaUsuario>(`${this.apiUrl}/${id}/activar`, {});
   }
 }

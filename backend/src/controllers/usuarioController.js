@@ -461,6 +461,33 @@ const desactivarUsuario = async (req, res) => {
  * - Requiere permisos especiales para su uso
  * - Retorna usuario completo incluyendo datos sensibles
  */
+const activarUsuario = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const usuario = await Usuario.findByPk(id);
+
+    if (!usuario) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    await usuario.update({ activo: true });
+
+    res.json({
+      success: true,
+      message: 'Usuario activado exitosamente'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error al activar usuario'
+    });
+  }
+};
+
 const crearUsuarioRoot = async (req, res) => {
   try {
     const { nombre, correo, rol, clave } = req.body;
@@ -492,5 +519,6 @@ module.exports = {
   crearUsuarioRoot,
   actualizarUsuario,
   cambiarClave,
-  desactivarUsuario
+  desactivarUsuario,
+  activarUsuario
 };

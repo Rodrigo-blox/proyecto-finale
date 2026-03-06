@@ -6,6 +6,7 @@ const {
   actualizarUsuario,
   cambiarClave,
   desactivarUsuario,
+  activarUsuario,
   crearUsuarioRoot
 } = require('../controllers/usuarioController');
 const { verificarToken, esAdmin } = require('../middleware/auth');
@@ -29,6 +30,7 @@ router.post('/create', verificarToken, esAdmin, validarUsuario, crearUsuario);
 router.post('/registroRoot', validarUsuario, crearUsuarioRoot);
 router.put('/:id', verificarToken, esAdmin, validarUUID, validarUsuario, actualizarUsuario);
 router.patch('/cambiar-clave', verificarToken, validarCambioClave, cambiarClave);
+router.patch('/:id/activar', verificarToken, esAdmin, validarUUID, activarUsuario);
 router.delete('/:id', verificarToken, esAdmin, validarUUID, desactivarUsuario);
 
 module.exports = router;
