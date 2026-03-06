@@ -9,8 +9,8 @@ export interface Usuario {
   correo: string;
   rol: 'ADMIN' | 'TECNICO' | 'SUPERVISOR';
   activo: boolean;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface FiltrosUsuarios {
